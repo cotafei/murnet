@@ -1,0 +1,14 @@
+{
+  "inbounds": [],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    }
+  ],
+  "murnet": {
+    "port": 8888,
+    "dataDir": "~/.murnet-vpn-server",
+    "exitMode": true
+  }
+}

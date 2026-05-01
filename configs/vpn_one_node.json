@@ -1,0 +1,30 @@
+{
+  "inbounds": [
+    {
+      "listen": "127.0.0.1",
+      "port": 1080,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": true
+      },
+      "sniffing": {
+        "enabled": false,
+        "destOverride": ["http", "tls", "quic"],
+        "routeOnly": true
+      },
+      "tag": "socks"
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    }
+  ],
+  "murnet": {
+    "port": 8888,
+    "dataDir": "~/.murnet-vpn",
+    "exitMode": true
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "inbounds": [
+    {
+      "listen": "127.0.0.1",
+      "port": 1080,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": true
+      },
+      "sniffing": {
+        "enabled": false,
+        "destOverride": ["http", "tls", "quic"],
+        "routeOnly": true
+      },
+      "tag": "socks"
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "murnet",
+      "settings": {
+        "peers": [
+          {
+            "address": "YOUR_EXIT_NODE_IP",
+            "port": 8888,
+            "id": "YOUR_EXIT_NODE_MURNET_ADDRESS"
+          }
+        ]
+      },
+      "tag": "proxy"
+    },
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "block"
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "type": "field",
+        "ip": ["geoip:private"],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "murnet": {
+    "port": 8889,
+    "dataDir": "~/.murnet-vpn-client"
+  }
+}

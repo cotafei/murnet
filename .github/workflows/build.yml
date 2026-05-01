@@ -1,0 +1,282 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"          # triggers on v6.0, v6.0.1, etc.
+  workflow_dispatch:  # manual trigger from GitHub UI
+    inputs:
+      version:
+        description: "Version tag (e.g. v6.0)"
+        required: false
+        default: "v6.0-dev"
+
+# ---------------------------------------------------------------------------
+# Permissions: allow creating releases and writing to the repo
+# ---------------------------------------------------------------------------
+permissions:
+  contents: write
+
+jobs:
+  # =========================================================================
+  # Tests — run before building
+  # =========================================================================
+  test:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov pytest-timeout
+
+      - name: Run unit tests
+        run: python -m pytest tests/unit/ -q --tb=short
+
+      - name: Run integration tests
+        timeout-minutes: 5
+        run: python -m pytest tests/integration/ -q --tb=short --timeout=60
+        continue-on-error: true   # integration tests need real network, allowed to fail
+
+  # =========================================================================
+  # Build EXE — Windows
+  # =========================================================================
+  build-windows:
+    name: Build Windows EXE
+    needs: test
+    runs-on: windows-latest
+    env:
+      MURNET_SECRET: ${{ secrets.MURNET_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install tkinter (Windows ships it by default)
+        run: echo "tkinter bundled with CPython on Windows"
+
+      - name: Build CLI
+        run: python build_exe.py --target cli
+
+      - name: Build Desktop
+        run: python build_exe.py --target desktop
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: murnet-cli-windows
+          path: dist/murnet-cli.exe
+
+      - name: Upload Desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: murnet-desktop-windows
+          path: dist/murnet-desktop.exe
+
+  # =========================================================================
+  # Build — Linux
+  # =========================================================================
+  build-linux:
+    name: Build Linux binary
+    needs: test
+    runs-on: ubuntu-22.04
+    env:
+      MURNET_SECRET: ${{ secrets.MURNET_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install system libs (tkinter)
+        run: sudo apt-get install -y python3-tk
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build CLI
+        run: python build_exe.py --target cli
+
+      - name: Build Desktop
+        run: python build_exe.py --target desktop
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: murnet-cli-linux
+          path: dist/murnet-cli
+
+      - name: Upload Desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: murnet-desktop-linux
+          path: dist/murnet-desktop
+
+  # =========================================================================
+  # Build — macOS
+  # =========================================================================
+  build-macos:
+    name: Build macOS binary
+    needs: test
+    runs-on: macos-latest
+    env:
+      MURNET_SECRET: ${{ secrets.MURNET_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build CLI
+        run: python build_exe.py --target cli
+
+      - name: Build Desktop
+        run: python build_exe.py --target desktop
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: murnet-cli-macos
+          path: dist/murnet-cli
+
+      - name: Upload Desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: murnet-desktop-macos
+          path: dist/murnet-desktop
+
+  # =========================================================================
+  # GitHub Release — only on version tags
+  # =========================================================================
+  release:
+    name: Create GitHub Release
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download all build artefacts
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: murnet-*
+          path: release-assets
+          merge-multiple: false
+
+      # Rename artefacts to include platform tags
+      - name: Rename artefacts
+        run: |
+          mkdir -p final
+          cp release-assets/murnet-cli-windows/murnet-cli.exe       final/murnet-cli-windows.exe
+          cp release-assets/murnet-desktop-windows/murnet-desktop.exe final/murnet-desktop-windows.exe
+          cp release-assets/murnet-cli-linux/murnet-cli              final/murnet-cli-linux
+          cp release-assets/murnet-desktop-linux/murnet-desktop      final/murnet-desktop-linux
+          cp release-assets/murnet-cli-macos/murnet-cli              final/murnet-cli-macos
+          cp release-assets/murnet-desktop-macos/murnet-desktop      final/murnet-desktop-macos
+          chmod +x final/murnet-cli-linux final/murnet-desktop-linux \
+                   final/murnet-cli-macos final/murnet-desktop-macos
+
+      # Generate SHA-256 checksums
+      - name: Generate checksums
+        run: |
+          cd final
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      # Extract version from tag
+      - name: Get version
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      # Create the release
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: "Murnet ${{ steps.get_version.outputs.version }}"
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          body: |
+            ## Murnet ${{ steps.get_version.outputs.version }}
+
+            > **Disclaimer:** Murnet is an experimental student P2P protocol.
+            > Not audited for production use.
+
+            ### Downloads
+
+            | Platform | CLI | Desktop GUI |
+            |----------|-----|-------------|
+            | Windows  | `murnet-cli-windows.exe` | `murnet-desktop-windows.exe` |
+            | Linux    | `murnet-cli-linux`       | `murnet-desktop-linux`       |
+            | macOS    | `murnet-cli-macos`       | `murnet-desktop-macos`       |
+
+            ### Quick Start
+
+            **CLI:**
+            ```bash
+            # Linux / macOS
+            chmod +x murnet-cli-linux
+            ./murnet-cli-linux --port 8888
+
+            # Windows
+            murnet-cli-windows.exe --port 8888
+            ```
+
+            **Desktop:**
+            Just double-click `murnet-desktop-*` for your platform.
+
+            ### Checksums
+            See `SHA256SUMS.txt` attached below.
+
+          files: |
+            final/murnet-cli-windows.exe
+            final/murnet-desktop-windows.exe
+            final/murnet-cli-linux
+            final/murnet-desktop-linux
+            final/murnet-cli-macos
+            final/murnet-desktop-macos
+            final/SHA256SUMS.txt
