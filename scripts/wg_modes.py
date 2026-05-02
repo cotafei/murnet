@@ -110,7 +110,12 @@ def mode_bypass():
         except ValueError:
             pass
 
-    print(f"  Загружено {len(cidrs)} подсетей")
+    # Принудительно добавляем YouTube/Telegram/Instagram — их нет в antifilter
+    for cidr in MUST_HAVE:
+        if cidr not in cidrs:
+            cidrs.append(cidr)
+
+    print(f"  Итого подсетей: {len(cidrs)} (antifilter + YouTube/Telegram/Instagram/Twitter)")
 
     if not cidrs:
         print("Список пустой — переключаюсь на full режим")
@@ -187,19 +192,27 @@ def mode_whitelist():
 
 # ─── вспомогательные ──────────────────────────────────────────────────────────
 
+MUST_HAVE = [
+    # YouTube / Google Video
+    "142.250.0.0/15", "172.253.0.0/16", "172.217.0.0/16",
+    "209.85.128.0/17", "216.58.192.0/19", "74.125.0.0/16",
+    "64.233.160.0/19", "66.102.0.0/20", "173.194.0.0/16",
+    # Telegram
+    "91.108.4.0/22",  "91.108.8.0/22",  "91.108.12.0/22",
+    "91.108.16.0/22", "91.108.20.0/22", "91.108.56.0/22",
+    "91.108.60.0/22", "149.154.160.0/20", "149.154.164.0/22",
+    "5.28.195.0/24",
+    # Instagram / Facebook
+    "31.13.24.0/21", "31.13.64.0/18", "157.240.0.0/17",
+    # Twitter / X
+    "104.244.42.0/21",
+    # Discord
+    "66.22.192.0/18",
+]
+
 def _fallback_blocked() -> list[str]:
-    """Минимальный резервный список если antifilter недоступен."""
-    return [
-        # YouTube
-        "142.250.0.0/15", "172.217.0.0/16", "216.58.192.0/19",
-        # Instagram / Facebook
-        "31.13.64.0/18", "157.240.0.0/17",
-        # Twitter / X
-        "104.244.42.0/21",
-        # Telegram
-        "91.108.4.0/22", "91.108.8.0/22", "91.108.56.0/22",
-        "149.154.160.0/20",
-    ]
+    """Резервный список если antifilter недоступен."""
+    return MUST_HAVE
 
 def _create_example_whitelist(path: str):
     with open(path, "w", encoding="utf-8") as f:
