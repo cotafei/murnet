@@ -111,10 +111,12 @@ class HiddenServiceClient:
                     headers[k.strip().lower()] = v.strip()
 
             host = headers.get("host", "")
+            # browsers add port: "addr.murnet:80" — strip it for the check
+            host_bare = host.split(":")[0]
 
-            if host.endswith(".murnet") or url.endswith(".murnet"):
+            if host_bare.endswith(".murnet") or ".murnet/" in url or url.endswith(".murnet"):
                 await self._handle_murnet(
-                    reader, writer, method, url, host, headers, line
+                    reader, writer, method, url, host_bare, headers, line
                 )
             else:
                 await self._handle_plain(
@@ -134,9 +136,9 @@ class HiddenServiceClient:
         reader, writer,
         method, url, host, headers, first_line,
     ) -> None:
-        addr = host if host.endswith(".murnet") else url.split("/")[2]
-
-        relay = self._directory.resolve(addr)
+        addr = host if host.endswith(".murnet") else url.split("/")[2].split(":")[0]
+        # browsers lowercase domain names — normalize for lookup
+        relay = self._directory.resolve(addr.lower())
         if not relay:
             writer.write(
                 b"HTTP/1.1 502 Bad Gateway\r\n\r\n"

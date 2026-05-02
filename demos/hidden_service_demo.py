@@ -163,7 +163,7 @@ async def main() -> None:
     await announce.broadcast_now()    # сразу первый анонс
 
     # Также регистрируем вручную (для мгновенного старта без ожидания gossip)
-    directory._entries[identity.address] = {
+    directory._entries[identity.address.lower()] = {
         "pubkey":    identity.public_bytes.hex(),
         "relay":     hs_addr,
         "timestamp": time.time(),

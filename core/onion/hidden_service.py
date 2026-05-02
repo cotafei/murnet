@@ -248,17 +248,17 @@ class HiddenServiceDirectory:
         if existing and existing["timestamp"] >= ts:
             return False
 
-        self._entries[addr] = {"pubkey": pubkey_hex, "relay": relay, "timestamp": ts}
+        self._entries[addr.lower()] = {"pubkey": pubkey_hex, "relay": relay, "timestamp": ts}
         logger.info("[hs] сервис обновлён: %s → %s", addr, relay)
         return True
 
     def resolve(self, addr: str) -> Optional[str]:
         """Возвращает relay-адрес для .murnet адреса или None."""
-        entry = self._entries.get(addr)
+        entry = self._entries.get(addr.lower())
         if not entry:
             return None
         if time.time() - entry["timestamp"] > 600:
-            self._entries.pop(addr, None)
+            self._entries.pop(addr.lower(), None)
             return None
         return entry["relay"]
 
