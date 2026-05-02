@@ -20,13 +20,17 @@ import os
 import sys
 import threading
 
-# ── Chromium proxy flag MUST be set before QApplication ────────────────────
+# ── Chromium proxy — set via env var BEFORE any Qt import ──────────────────
 _PROXY_PORT  = 18888
 _GUARD_PORT  = 18201
 _MIDDLE_PORT = 18202
 _CLIENT_PORT = 18204
 
-sys.argv += [f"--proxy-server=http://127.0.0.1:{_PROXY_PORT}"]
+# QTWEBENGINE_CHROMIUM_FLAGS is the correct way to pass Chromium flags
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+    f"--proxy-server=http://127.0.0.1:{_PROXY_PORT} "
+    f"--proxy-bypass-list=<-loopback>"   # route even localhost .murnet through proxy
+)
 sys.path.insert(0, os.path.dirname(__file__))
 
 from PyQt6.QtCore    import QUrl, Qt, QObject, pyqtSignal
@@ -172,12 +176,17 @@ class BrowserWindow(QMainWindow):
         QShortcut(QKeySequence("Alt+Right"), self, self._view.forward)
         QShortcut(QKeySequence("F5"),        self, self._view.reload)
 
+        # Disable navigation until proxy is ready
+        self._addr.setEnabled(False)
+
         # Show startup page
         self._view.setHtml(_PAGE_LOADING)
 
     # ── slots ─────────────────────────────────────────────────────────────
 
     def _on_ready(self) -> None:
+        self._addr.setEnabled(True)
+        self._addr.setFocus()
         self._status_label.setText(
             f"Onion ready  ·  proxy 127.0.0.1:{_PROXY_PORT}"
         )
@@ -225,6 +234,17 @@ async def _start_nodes(signals: _Signals) -> None:
         directory = HiddenServiceDirectory()
         for t in (cli_t, guard_t, mid_t):
             t.hs_directory = directory
+
+        # Load services written by hidden_service_demo.py
+        _peers_file = os.path.join(os.path.dirname(__file__), ".murnet_peers.json")
+        if os.path.exists(_peers_file):
+            import json as _json
+            try:
+                data = _json.load(open(_peers_file))
+                for addr, entry in data.get("services", {}).items():
+                    directory._entries[addr] = entry
+            except Exception:
+                pass
 
         proxy = HiddenServiceClient(
             cli_r, cli_t, directory, proxy_port=_PROXY_PORT

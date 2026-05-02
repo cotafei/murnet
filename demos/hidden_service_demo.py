@@ -169,6 +169,20 @@ async def main() -> None:
         "timestamp": time.time(),
     }
 
+    # Пишем peers-файл чтобы murnet_browser.py мог найти этот сервис
+    import json as _json
+    _peers_file = os.path.join(os.path.dirname(__file__), "..", ".murnet_peers.json")
+    with open(_peers_file, "w") as _f:
+        _json.dump({
+            "services": {
+                identity.address.lower(): {
+                    "pubkey":    identity.public_bytes.hex(),
+                    "relay":     hs_addr,
+                    "timestamp": time.time(),
+                }
+            }
+        }, _f, indent=2)
+
     # 8. HTTP-прокси для браузера
     proxy = HiddenServiceClient(cli_r, cli_t, directory,
                                  proxy_port=PORT_PROXY)
