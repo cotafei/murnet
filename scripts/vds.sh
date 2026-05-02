@@ -6,7 +6,10 @@
 #   ./scripts/vds.sh start           -- start relays (Guard/Middle/Exit)
 #   ./scripts/vds.sh stop            -- kill all relay processes
 #   ./scripts/vds.sh status          -- show process list + API status
-#   ./scripts/vds.sh logs [name]     -- tail logs (Guard/Middle/Exit, or all)
+#   ./scripts/vds.sh logs [name]     -- tail logs (Guard/Middle/Exit/VpnExit, or all)
+#   ./scripts/vds.sh vpn-start       -- start VPN exit node on port 9010
+#   ./scripts/vds.sh vpn-stop        -- kill VPN exit node
+#   ./scripts/vds.sh vpn-deploy      -- deploy vpn_onion.py + (re)start VPN exit
 #   ./scripts/vds.sh ssh             -- open interactive shell on VDS
 
 set -euo pipefail
@@ -106,12 +109,45 @@ cmd_logs() {
     if [[ -n "$name" ]]; then
         remote "tail -f $LOG_DIR/${name}.log"
     else
-        remote "tail -f $LOG_DIR/Guard.log $LOG_DIR/Middle.log $LOG_DIR/Exit.log"
+        remote "tail -f $LOG_DIR/Guard.log $LOG_DIR/Middle.log $LOG_DIR/Exit.log $LOG_DIR/VpnExit.log 2>/dev/null"
     fi
 }
 
 cmd_ssh() {
     $SSH
+}
+
+cmd_vpn_start() {
+    info "Starting VPN exit node on :9010 ..."
+    remote "bash -c 'cd $REMOTE_DIR && setsid python demos/vpn_onion.py \
+        --mode exit --bind 0.0.0.0:9010 --name VpnExit --log WARNING \
+        > $LOG_DIR/VpnExit.log 2>&1 </dev/null &'"
+    sleep 1
+    info "VPN exit started."
+    remote "pgrep -a -f vpn_onion.py 2>/dev/null || echo '  (not found)'"
+}
+
+cmd_vpn_stop() {
+    info "Stopping VPN exit node..."
+    remote "pkill -f 'vpn_onion.py' 2>/dev/null; echo stopped" || true
+}
+
+cmd_vpn_deploy() {
+    info "Deploying vpn_onion.py to VDS..."
+    $SCP demos/vpn_onion.py "$VDS_USER@$VDS_HOST:$REMOTE_DIR/demos/"
+    cmd_vpn_stop 2>/dev/null || true
+    sleep 1
+    cmd_vpn_start
+    echo ""
+    echo "VPN exit running on $VDS_HOST:9010"
+    echo ""
+    echo "Connect locally:"
+    echo "  python demos/vpn_onion.py --mode client \\"
+    echo "      --peer Guard=$VDS_HOST:9001 \\"
+    echo "      --peer Middle=$VDS_HOST:9002 \\"
+    echo "      --peer VpnExit=$VDS_HOST:9010 \\"
+    echo "      --circuit Guard,Middle,VpnExit \\"
+    echo "      --socks 127.0.0.1:1080"
 }
 
 # ── dispatch ──────────────────────────────────────────────────────────────────
@@ -120,16 +156,19 @@ CMD="${1:-help}"
 shift || true
 
 case "$CMD" in
-    deploy) cmd_deploy ;;
-    start)  cmd_start  ;;
-    stop)   cmd_stop   ;;
-    status) cmd_status ;;
-    logs)   cmd_logs "${1:-}" ;;
-    ssh)    cmd_ssh    ;;
+    deploy)     cmd_deploy ;;
+    start)      cmd_start  ;;
+    stop)       cmd_stop   ;;
+    status)     cmd_status ;;
+    logs)       cmd_logs "${1:-}" ;;
+    vpn-start)  cmd_vpn_start ;;
+    vpn-stop)   cmd_vpn_stop  ;;
+    vpn-deploy) cmd_vpn_deploy ;;
+    ssh)        cmd_ssh    ;;
     help|--help|-h)
-        grep '^#' "$0" | head -12 | sed 's/^# //'
+        grep '^#' "$0" | head -15 | sed 's/^# //'
         ;;
     *)
-        die "Unknown command: $CMD. Use deploy|start|stop|status|logs|ssh"
+        die "Unknown command: $CMD. Use deploy|start|stop|status|logs|vpn-start|vpn-stop|vpn-deploy|ssh"
         ;;
 esac
