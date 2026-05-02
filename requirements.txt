@@ -34,5 +34,9 @@ puremagic>=1.20,<2.0
 # TUI (optional — needed for demos/onion_node.py and demos/onion_chat.py)
 textual>=0.70.0
 
+# Browser (optional — needed for murnet_browser.py)
+PyQt6>=6.6.0
+PyQt6-WebEngine>=6.6.0
+
 # Build (optional — only needed for EXE packaging)
 # pyinstaller>=6.0.0
