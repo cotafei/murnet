@@ -42,10 +42,10 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore    import QWebEngineProfile, QWebEngineSettings
 
-from core.onion.router        import OnionRouter
-from core.onion.transport     import OnionTransport
-from core.onion.hidden_service import HiddenServiceDirectory
-from core.onion.hs_client     import HiddenServiceClient
+from core.onion.router          import OnionRouter
+from core.onion.obfs_transport  import ObfsTransport as OnionTransport
+from core.onion.hidden_service  import HiddenServiceDirectory
+from core.onion.hs_client       import HiddenServiceClient
 
 # ── HTML-шаблоны ──────────────────────────────────────────────────────────
 
@@ -240,8 +240,10 @@ async def _start_nodes(signals: _Signals) -> None:
         if os.path.exists(_peers_file):
             import json as _json
             try:
+                import time as _time
                 data = _json.load(open(_peers_file))
                 for addr, entry in data.get("services", {}).items():
+                    entry["timestamp"] = _time.time()  # refresh so TTL doesn't expire
                     directory._entries[addr] = entry
             except Exception:
                 pass

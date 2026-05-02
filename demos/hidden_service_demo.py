@@ -31,15 +31,15 @@ from threading import Thread
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from core.onion.router import OnionRouter
-from core.onion.transport import OnionTransport
-from core.onion.hidden_service import (
+from core.onion.router          import OnionRouter
+from core.onion.obfs_transport  import ObfsTransport as OnionTransport
+from core.onion.hidden_service  import (
     HiddenServiceIdentity,
     HiddenServiceAnnounce,
     HiddenServiceDirectory,
 )
-from core.onion.hs_router import HiddenServiceRouter
-from core.onion.hs_client import HiddenServiceClient
+from core.onion.hs_router  import HiddenServiceRouter
+from core.onion.hs_client  import HiddenServiceClient
 
 logging.basicConfig(level=logging.WARNING,
                     format="%(asctime)s %(name)s %(levelname)s  %(message)s")
