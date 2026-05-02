@@ -601,7 +601,7 @@ class MurnetCLI:
         addr  = (self.node.address[:8] + "…") if self.node else "offline"
         state = "●" if self.node else "○"
         color = "ansicyan" if self.node else "ansired"
-        return HTML(f'<{color}>{state} murnet</> '
+        return HTML(f'<{color}>{state} murnet</{color}> '
                     f'<ansiwhite>({addr})</ansiwhite>'
                     f'<ansibrightblack> ❯ </ansibrightblack>')
 
