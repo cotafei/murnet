@@ -49,13 +49,20 @@ def upload_and_qr(config: str, mode: str) -> str:
     remote_png = f"/tmp/wg_phone_{mode}.png"
     local_png  = os.path.join(DESKTOP, f"murnet_vpn_{mode}.png")
 
-    # Upload config
-    proc = subprocess.Popen(
-        ["scp", "-i", VDS_KEY, "-o", "StrictHostKeyChecking=no",
-         "-", f"{VDS_USER}@{VDS}:{remote_cfg}"],
-        stdin=subprocess.PIPE
-    )
-    proc.communicate(config.encode())
+    # Write config to a local temp file, then scp it up
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".conf",
+                                     delete=False, encoding="utf-8") as tf:
+        tf.write(config)
+        tmp_path = tf.name
+
+    try:
+        subprocess.run(
+            ["scp", "-i", VDS_KEY, "-o", "StrictHostKeyChecking=no",
+             tmp_path, f"{VDS_USER}@{VDS}:{remote_cfg}"],
+            check=True, capture_output=True
+        )
+    finally:
+        os.unlink(tmp_path)
 
     # Generate QR on VDS
     vds(f"qrencode -t PNG -o {remote_png} -s 8 < {remote_cfg}")
@@ -64,7 +71,7 @@ def upload_and_qr(config: str, mode: str) -> str:
     subprocess.run(
         ["scp", "-i", VDS_KEY, "-o", "StrictHostKeyChecking=no",
          f"{VDS_USER}@{VDS}:{remote_png}", local_png],
-        check=True
+        check=True, capture_output=True
     )
     return local_png
 
@@ -78,21 +85,20 @@ def mode_full():
 
 def mode_bypass():
     """
-    Скачиваем список заблокированных IP с antifilter.download.
-    Только они идут через VPN — остальное напрямую (быстрее).
+    Качаем allyouneed.lst (15k подсетей) — список заблокированных в РФ.
+    Конфиг слишком большой для QR — сохраняем .conf файл для прямого импорта.
     """
-    print("Режим: BYPASS — загружаю список заблокированных IP с antifilter.download …")
+    print("Режим: BYPASS — загружаю allyouneed.lst с antifilter.download …")
 
-    url = "https://antifilter.download/list/subnet.lst"
+    url = "https://antifilter.download/list/allyouneed.lst"
     try:
-        with urllib.request.urlopen(url, timeout=30) as r:
+        with urllib.request.urlopen(url, timeout=60) as r:
             lines = r.read().decode().splitlines()
     except Exception as e:
         print(f"Не удалось скачать список: {e}")
-        print("Используем резервный короткий список …")
+        print("Используем резервный список ключевых сервисов …")
         lines = _fallback_blocked()
 
-    # Фильтруем валидные CIDR
     cidrs = []
     for line in lines:
         line = line.strip()
@@ -106,7 +112,6 @@ def mode_bypass():
 
     print(f"  Загружено {len(cidrs)} подсетей")
 
-    # WireGuard AllowedIPs не может быть пустым
     if not cidrs:
         print("Список пустой — переключаюсь на full режим")
         mode_full()
@@ -114,9 +119,19 @@ def mode_bypass():
 
     allowed = ", ".join(cidrs)
     cfg  = make_config(allowed)
-    path = upload_and_qr(cfg, "bypass")
-    print(f"QR сохранён: {path}")
-    print("Через VPN идут только заблокированные сайты. Остальное — напрямую.")
+
+    # Список слишком большой для QR — сохраняем .conf напрямую
+    local_conf = os.path.join(DESKTOP, "murnet_vpn_bypass.conf")
+    with open(local_conf, "w", encoding="utf-8") as f:
+        f.write(cfg)
+
+    print(f"Конфиг сохранён: {local_conf}")
+    print("")
+    print("Как импортировать в WireGuard:")
+    print("  Android: кнопка + > Импортировать из файла > выбери murnet_vpn_bypass.conf")
+    print("  iOS:     передай файл через AirDrop/iCloud, открой в WireGuard")
+    print("")
+    print("Через VPN идут только заблокированные (~15к подсетей). Остальное напрямую.")
 
 def mode_whitelist():
     """
