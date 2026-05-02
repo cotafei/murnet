@@ -13,6 +13,7 @@ requests>=2.31.0
 pydantic>=2.6.0
 fastapi>=0.109.0
 uvicorn>=0.27.0
+python-multipart>=0.0.9
 
 # Async performance (Linux/macOS only)
 uvloop>=0.19.0; platform_system != "Windows"
