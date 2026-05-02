@@ -74,7 +74,7 @@ class HiddenServiceClient:
         )
         logger.info("[hs_client] HTTP прокси на %s:%s", self._host, self._port)
         print(f"  HTTP прокси: {self._host}:{self._port}")
-        print(f"  В браузере: Настройки → HTTP прокси → {self._host}:{self._port}")
+        print(f"  В браузере: Настройки > HTTP прокси > {self._host}:{self._port}")
 
     async def stop(self) -> None:
         if self._server:

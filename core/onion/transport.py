@@ -217,6 +217,19 @@ class OnionTransport:
                         except Exception:
                             pass
 
+    async def _broadcast_raw(self, packet: dict) -> None:
+        """Broadcast any JSON packet to all live peers (used by hidden service announce)."""
+        msg = json.dumps(packet) + "\n"
+        encoded = msg.encode()
+        for pool in (self._inc, self._out):
+            for w in list(pool.values()):
+                if not w.is_closing():
+                    try:
+                        w.write(encoded)
+                        await w.drain()
+                    except Exception:
+                        pass
+
     # ── incoming ──────────────────────────────────────────────────────────────
 
     async def _on_accept(
@@ -264,6 +277,18 @@ class OnionTransport:
                                                   wrapper["announce"],
                                                   wrapper.get("ttl", 1))
                         )
+                        continue
+
+                    # Hidden service announce
+                    if "hs_announce" in wrapper:
+                        if hasattr(self, "hs_directory") and self.hs_directory:
+                            self.hs_directory.handle_announce(wrapper)
+                        # Forward with ttl-1
+                        ttl = wrapper.get("ttl", 1)
+                        if ttl > 1:
+                            fwd = dict(wrapper, ttl=ttl - 1,
+                                       src=self.router.addr)
+                            asyncio.create_task(self._broadcast_raw(fwd))
                         continue
 
                     cell_dict = wrapper.get("cell", {})

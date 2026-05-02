@@ -146,12 +146,12 @@ class HiddenServiceAnnounce:
     def __init__(
         self,
         identity: HiddenServiceIdentity,
-        transport,          # OnionTransport
-        relay_addr: str,    # адрес entry-relay (куда клиент строит circuit)
+        transport,
+        relay: str,
     ) -> None:
         self._id       = identity
         self._transport = transport
-        self._relay     = relay_addr
+        self._relay     = relay
         self._task: Optional[asyncio.Task] = None
 
     def start(self) -> None:
@@ -160,6 +160,9 @@ class HiddenServiceAnnounce:
     def stop(self) -> None:
         if self._task:
             self._task.cancel()
+
+    async def broadcast_now(self) -> None:
+        await self._broadcast()
 
     async def _loop(self) -> None:
         while True:
