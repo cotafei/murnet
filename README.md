@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)](docs/ARCHITECTURE.md)
-[![CI](https://github.com/cotafei/MurNet/actions/workflows/build.yml/badge.svg)](https://github.com/cotafei/MurNet/actions/workflows/build.yml)
+[![CI](https://github.com/cotafei/murnet/actions/workflows/build.yml/badge.svg)](https://github.com/cotafei/MurNet/actions/workflows/build.yml)
 
 **MurNet** — децентрализованная P2P-сеть с onion routing, DHT и VPN-туннелем.
 
