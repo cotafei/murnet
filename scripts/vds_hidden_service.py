@@ -30,7 +30,7 @@ from core.onion.hidden_service  import (
 )
 from core.onion.hs_router     import HiddenServiceRouter
 
-logging.basicConfig(level=logging.WARNING,
+logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(name)s %(levelname)s  %(message)s")
 
 VDS_IP     = os.environ.get("VDS_IP",    "80.93.52.15")
@@ -248,8 +248,17 @@ async def main() -> None:
     print("  Ctrl+C для остановки\n")
 
     try:
+        sec_timer = 0
         while True:
-            await asyncio.sleep(30)
+            await asyncio.sleep(10)
+            sec_timer += 10
+            if sec_timer >= 60:
+                sec_timer = 0
+                total_rejected = guard_t.probes_rejected + hs_t.probes_rejected
+                if total_rejected > 0:
+                    print(f"🛡️ Security Monitor: {total_rejected} probes rejected (RKN) | SNI: {guard_t.sni}")
+                else:
+                    print(f"🛡️ Security Monitor: OK | No suspicious probes detected | SNI: {guard_t.sni}")
     except (KeyboardInterrupt, asyncio.CancelledError):
         pass
     finally:

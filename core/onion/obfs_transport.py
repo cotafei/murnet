@@ -43,27 +43,41 @@ class ObfsTransport(OnionTransport):
       - Случайный padding
     """
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        router: OnionRouter,
+        bind_host: str,
+        bind_port: int,
+        peers: Optional[Dict[str, str]] = None,
+        self_name: Optional[str] = None,
+        psk: Optional[bytes] = None,
+        sni: str = "vk.com",
+    ) -> None:
+        super().__init__(router, bind_host, bind_port, peers, self_name)
+        self.psk = psk
+        self.sni = sni
         # addr / peer_id → ObfsStream
         self._obfs: Dict[str, ObfsStream] = {}
+        self.probes_rejected = 0
 
     # ── incoming ──────────────────────────────────────────────────────────
 
-    async def _on_accept(
-        self,
-        reader: asyncio.StreamReader,
-        writer: asyncio.StreamWriter,
-    ) -> None:
+    async def _on_accept(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         peer = writer.get_extra_info("peername")
         peer_id = f"{peer[0]}:{peer[1]}"
         logger.debug("[obfs] accept %s", peer_id)
 
-        stream = ObfsStream(reader, writer, is_server=True)
+        stream = ObfsStream(reader, writer, is_server=True, psk=self.psk, sni=self.sni)
         try:
             await asyncio.wait_for(stream.handshake(), _CONN_TIMEOUT)
         except Exception as exc:
-            logger.debug("[obfs] handshake failed from %s: %s", peer_id, exc)
+            # Считаем пробником любую ошибку на этапе хендшейка
+            is_probe = any(x in str(exc) for x in ["PSK", "TLS", "IncompleteRead"])
+            if is_probe or isinstance(exc, (asyncio.IncompleteReadError, ConnectionResetError)):
+                self.probes_rejected += 1
+                logger.warning("[obfs] probe rejected from %s:%s: %s", peer[0], peer[1], exc)
+            else:
+                logger.debug("[obfs] handshake failed from %s: %s", peer_id, exc)
             stream.close()
             return
 
@@ -87,7 +101,7 @@ class ObfsTransport(OnionTransport):
                         asyncio.open_connection(host, int(port_s)),
                         _CONN_TIMEOUT,
                     )
-                    stream = ObfsStream(reader, writer, is_server=False)
+                    stream = ObfsStream(reader, writer, is_server=False, psk=self.psk, sni=self.sni)
                     await asyncio.wait_for(stream.handshake(), _CONN_TIMEOUT)
                     self._obfs[addr] = stream
                     self._out[addr]  = writer

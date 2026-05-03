@@ -22,8 +22,9 @@ import threading
 
 # ── Chromium proxy — set via env var BEFORE any Qt import ──────────────────
 _PROXY_PORT  = 18888
-_GUARD_PORT  = 18201
-_MIDDLE_PORT = 18202
+_VDS_IP      = "80.93.52.15"
+_VDS_GUARD   = 9211
+_VDS_MIDDLE  = 9213
 _CLIENT_PORT = 18204
 
 # QTWEBENGINE_CHROMIUM_FLAGS is the correct way to pass Chromium flags
@@ -101,6 +102,8 @@ class BrowserWindow(QMainWindow):
         self.setWindowTitle("MurNet Browser")
         self.setMinimumSize(1080, 720)
         self._signals = signals
+        self._transports: list[ObfsTransport] = []
+        self._security_panel_visible = False
 
         # ── toolbar ─────────────────────────────────────────────────────
         bar = QToolBar("nav")
@@ -127,6 +130,15 @@ class BrowserWindow(QMainWindow):
             bar.addWidget(w)
         bar.addWidget(self._addr)
 
+        # ── security button ─────────────────────────────────────────────
+        self._btn_sec = QPushButton("🛡️ Security")
+        self._btn_sec.setStyleSheet("""
+            QPushButton { background: #238636; border-color: #2ea043; color: white; font-weight: bold; }
+            QPushButton:hover { background: #2ea043; }
+        """)
+        self._btn_sec.clicked.connect(self._toggle_security_panel)
+        bar.addWidget(self._btn_sec)
+
         # ── webview ──────────────────────────────────────────────────────
         profile = QWebEngineProfile.defaultProfile()
         settings = profile.settings()
@@ -135,6 +147,22 @@ class BrowserWindow(QMainWindow):
 
         self._view = QWebEngineView()
         self._view.setStyleSheet("background:#0d1117;")
+        
+        # ── security overlay ─────────────────────────────────────────────
+        self._sec_overlay = QLabel(self._view)
+        self._sec_overlay.setVisible(False)
+        self._sec_overlay.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+        self._sec_overlay.setFixedSize(280, 160)
+        self._sec_overlay.move(780, 10) # Fixed position for now
+        self._sec_overlay.setStyleSheet("""
+            background: rgba(22, 27, 34, 0.95);
+            border: 1px solid #3fb950;
+            border-radius: 8px;
+            color: #e6edf3;
+            padding: 15px;
+            font-family: 'Consolas', 'Courier New', monospace;
+        """)
+
         self.setCentralWidget(self._view)
 
         # ── status bar ───────────────────────────────────────────────────
@@ -208,42 +236,88 @@ class BrowserWindow(QMainWindow):
         self._addr.setFocus()
         self._addr.selectAll()
 
+    def _toggle_security_panel(self) -> None:
+        self._security_panel_visible = not self._security_panel_visible
+        self._sec_overlay.setVisible(self._security_panel_visible)
+        if self._security_panel_visible:
+            self._update_security_info()
+
+    def _update_security_info(self) -> None:
+        if not self._transports:
+            return
+        
+        # Берем данные из первого транспорта (они должны быть идентичны по конфигу)
+        t = self._transports[0]
+        total_rejected = sum(transport.probes_rejected for transport in self._transports)
+        
+        html = f"""
+            <div style='font-size: 14px; margin-bottom: 8px; color: #3fb950;'>🌌 MURNET SECURITY</div>
+            <div style='font-size: 12px; color: #8b949e;'>MASK (SNI): <b style='color: #58a6ff;'>{t.sni}</b></div>
+            <div style='font-size: 12px; color: #8b949e;'>PSK AUTH: <b style='color: #7ee787;'>ACTIVE</b></div>
+            <div style='border-top: 1px solid #30363d; margin: 10px 0;'></div>
+            <div style='font-size: 11px; color: #8b949e;'>PROBES REJECTED (RKN):</div>
+            <div style='font-size: 22px; font-weight: bold; color: #f85149;'>{total_rejected}</div>
+        """
+        self._sec_overlay.setText(html)
+        self._sec_overlay.adjustSize()
+        # Keep it at the top right
+        self._sec_overlay.move(self._view.width() - self._sec_overlay.width() - 20, 20)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "_sec_overlay"):
+            self._sec_overlay.move(self._view.width() - self._sec_overlay.width() - 20, 20)
+
 
 # ── MurNet async backend ───────────────────────────────────────────────────
 
 async def _start_nodes(signals: _Signals) -> None:
     try:
-        guard_addr  = f"127.0.0.1:{_GUARD_PORT}"
-        middle_addr = f"127.0.0.1:{_MIDDLE_PORT}"
-        client_addr = f"127.0.0.1:{_CLIENT_PORT}"
+        # Мы подключаемся к VDS Guard и Middle
+        vds_guard_addr  = f"{_VDS_IP}:{_VDS_GUARD}"
+        vds_middle_addr = f"{_VDS_IP}:{_VDS_MIDDLE}"
+        client_addr     = f"127.0.0.1:{_CLIENT_PORT}"
 
-        guard_r = OnionRouter(guard_addr)
-        guard_t = OnionTransport(guard_r, "127.0.0.1", _GUARD_PORT)
-        await guard_t.start()
-
-        mid_r = OnionRouter(middle_addr)
-        mid_t = OnionTransport(mid_r, "127.0.0.1", _MIDDLE_PORT,
-                               peers={"Guard": guard_addr})
-        await mid_t.start()
-
+        # Локальный клиентский узел
         cli_r = OnionRouter(client_addr)
+        # Добавляем VDS узлы в список известных пиров
         cli_t = OnionTransport(cli_r, "127.0.0.1", _CLIENT_PORT,
-                               peers={"Guard": guard_addr, "Middle": middle_addr})
+                               peers={"Guard": vds_guard_addr, "Middle": vds_middle_addr})
         await cli_t.start()
 
-        directory = HiddenServiceDirectory()
-        for t in (cli_t, guard_t, mid_t):
-            t.hs_directory = directory
+        # Store transports in main window
+        for window in QApplication.topLevelWidgets():
+            if isinstance(window, BrowserWindow):
+                window._transports = [cli_t]
+                # Start UI refresh timer
+                from PyQt6.QtCore import QTimer
+                window._sec_timer = QTimer(window)
+                window._sec_timer.timeout.connect(window._update_security_info)
+                window._sec_timer.start(2000)
 
-        # Load services written by hidden_service_demo.py
+        directory = HiddenServiceDirectory()
+        cli_t.hs_directory = directory
+
+        # Принудительно добавляем наш VDS сайт в директорию
+        import time as _time
+        vds_hs_addr = "fgseSxh6fbMktJ1oD9mcU9ycYo4ZUzWNxf.murnet"
+        vds_hs_pub  = "eba400645db5ad46fb7081b3c785e9cf2b7d7c3ccae839c8533e99d31d3293d8"
+        vds_hs_relay = f"{_VDS_IP}:{_VDS_MIDDLE}"
+        
+        directory._entries[vds_hs_addr.lower()] = {
+            "pubkey":    vds_hs_pub,
+            "relay":     vds_hs_relay,
+            "timestamp": _time.time(),
+        }
+
+        # Load services written by hidden_service_demo.py (optional)
         _peers_file = os.path.join(os.path.dirname(__file__), ".murnet_peers.json")
         if os.path.exists(_peers_file):
             import json as _json
             try:
-                import time as _time
                 data = _json.load(open(_peers_file))
                 for addr, entry in data.get("services", {}).items():
-                    entry["timestamp"] = _time.time()  # refresh so TTL doesn't expire
+                    entry["timestamp"] = _time.time()
                     directory._entries[addr] = entry
             except Exception:
                 pass

@@ -4,10 +4,15 @@ ObfsStream — обфускация трафика MurNet.
 Для наблюдателя (DPI/провайдер) соединение выглядит как поток случайных байт:
 
   Handshake:
-    → 32 байта (X25519 pubkey клиента, неотличимы от шума)
-    ← 32 байта (X25519 pubkey сервера, неотличимы от шума)
-    Оба вычисляют общий ключ через X25519 + HKDF-SHA256.
-    Нет magic bytes, нет version field, нет имени протокола.
+    → [Fake TLS ClientHello with SNI (vk.com/yandex.ru)]
+    → [32 байта: X25519 pubkey]
+    → [16 байт: HMAC-SHA256(PSK, pubkey)]
+    ← [Fake TLS ServerHello]
+    ← [32 байта: X25519 pubkey]
+    ← [16 байт: HMAC-SHA256(PSK, pubkey)]
+
+    Если PSK не совпадает, сервер закрывает соединение без ответа (stealth).
+    Если SNI не передан, используется vk.com (для маскировки в РФ).
 
   Фрейм данных:
     [4 байта LE: len(ciphertext)]
@@ -27,6 +32,8 @@ ObfsStream — обфускация трафика MurNet.
 from __future__ import annotations
 
 import asyncio
+import hmac
+import hashlib
 import os
 import struct
 from typing import Optional
@@ -57,6 +64,7 @@ class ObfsStream:
     __slots__ = (
         "_reader", "_writer", "_is_server",
         "_send_aead", "_recv_aead",
+        "_psk", "_sni",
     )
 
     def __init__(
@@ -64,29 +72,92 @@ class ObfsStream:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
         is_server: bool = False,
+        psk: Optional[bytes] = None,
+        sni: str = "vk.com",
     ) -> None:
         self._reader    = reader
         self._writer    = writer
         self._is_server = is_server
+        self._psk       = psk or b"murnet-default-psk-v1"
+        self._sni       = sni
         self._send_aead: Optional[ChaCha20Poly1305] = None
         self._recv_aead: Optional[ChaCha20Poly1305] = None
+
+    # ── helpers ───────────────────────────────────────────────────────────
+
+    def _get_hmac(self, key: bytes, data: bytes) -> bytes:
+        return hmac.new(key, data, hashlib.sha256).digest()[:16]
+
+    def _make_client_hello(self) -> bytes:
+        """Минимальный TLS ClientHello с SNI."""
+        # Упрощенная структура для обхода DPI
+        # [Record Header: 16 03 01 len]
+        # [Handshake Header: 01 len]
+        # [ClientHello: version, random, session_id, ciphers, compression, extensions(SNI)]
+        sni_bytes = self._sni.encode()
+        sni_ext   = struct.pack(">HHH", 0, len(sni_bytes) + 5, len(sni_bytes) + 3) + b"\x00" + struct.pack(">H", len(sni_bytes)) + sni_bytes
+        ext_len   = len(sni_ext)
+        ch_body   = b"\x03\x03" + os.urandom(32) + b"\x00\x00\x02\x00\x2f\x01\x00" + struct.pack(">H", ext_len) + sni_ext
+        ch_header = b"\x01" + struct.pack(">I", len(ch_body))[1:]
+        record    = b"\x16\x03\x01" + struct.pack(">H", len(ch_header) + len(ch_body))
+        return record + ch_header + ch_body
+
+    def _make_server_hello(self) -> bytes:
+        """Минимальный TLS ServerHello."""
+        sh_body   = b"\x03\x03" + os.urandom(32) + b"\x00\x00\x2f\x00"
+        sh_header = b"\x01" + struct.pack(">I", len(sh_body))[1:]
+        record    = b"\x16\x03\x03" + struct.pack(">H", len(sh_header) + len(sh_body))
+        # Добавим ChangeCipherSpec для правдоподобности
+        ccs       = b"\x14\x03\x03\x00\x01\x01"
+        return record + sh_header + sh_body + ccs
 
     # ── handshake ─────────────────────────────────────────────────────────
 
     async def handshake(self) -> None:
-        """X25519 key exchange. Клиент пишет первым."""
+        """X25519 + PSK handshake под прикрытием TLS."""
         priv  = X25519PrivateKey.generate()
-        my_pk = priv.public_key().public_bytes_raw()  # 32 bytes
+        my_pk = priv.public_key().public_bytes_raw()
+        my_hmac = self._get_hmac(self._psk, my_pk)
 
         if not self._is_server:
-            self._writer.write(my_pk)
-            await self._writer.drain()
-            peer_pk_bytes = await self._reader.readexactly(32)
-        else:
-            peer_pk_bytes = await self._reader.readexactly(32)
-            self._writer.write(my_pk)
+            # Клиент: TLS ClientHello + Pubkey + PSK-Auth
+            self._writer.write(self._make_client_hello())
+            self._writer.write(my_pk + my_hmac)
             await self._writer.drain()
 
+            # Читаем ServerHello (пропускаем record-слой)
+            # Мы знаем примерный размер наших фейковых записей
+            # record(5) + handshake_hdr(4) + body(38) + ccs(6) = 53
+            await self._reader.readexactly(53)
+
+            # Читаем ответные ключи
+            peer_data = await self._reader.readexactly(32 + 16)
+        else:
+            # Сервер: Читаем ClientHello (примерно 100-150 байт в зависимости от SNI)
+            # Чтобы не зависеть от точного размера, читаем заголовок рекорда
+            rec_hdr = await self._reader.readexactly(5)
+            if rec_hdr[0] != 0x16:
+                raise ValueError("Not a TLS handshake")
+            rec_len = struct.unpack(">H", rec_hdr[3:5])[0]
+            await self._reader.readexactly(rec_len)
+
+            # Читаем Pubkey + HMAC
+            peer_data = await self._reader.readexactly(32 + 16)
+            peer_pk_bytes = peer_data[:32]
+            peer_hmac     = peer_data[32:]
+
+            # ПРОВЕРКА PSK
+            if not hmac.compare_digest(peer_hmac, self._get_hmac(self._psk, peer_pk_bytes)):
+                # МОЛЧИМ И ЗАКРЫВАЕМСЯ
+                self._writer.close()
+                raise ConnectionError("PSK authentication failed (silent drop)")
+
+            # Если ок — отвечаем своим TLS + Pubkey + HMAC
+            self._writer.write(self._make_server_hello())
+            self._writer.write(my_pk + my_hmac)
+            await self._writer.drain()
+
+        peer_pk_bytes = peer_data[:32]
         peer_pk = X25519PublicKey.from_public_bytes(peer_pk_bytes)
         shared  = priv.exchange(peer_pk)
 

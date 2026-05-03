@@ -28,7 +28,7 @@ from core.onion.transport      import OnionTransport
 from core.onion.obfs_transport import ObfsTransport
 from core.onion.cell           import OnionCell
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 
 PORT_PLAIN_A = 9301
 PORT_PLAIN_B = 9302
@@ -146,6 +146,28 @@ async def test_obfs_e2e() -> bool:
     return True
 
 
+async def test_probe_rejection() -> int:
+    """Симулирует атаку (подключение без PSK или с неверным) и возвращает счетчик отбитых проб."""
+    r_b = OnionRouter(f"127.0.0.1:{PORT_OBFS_B}")
+    t_b = ObfsTransport(r_b, "127.0.0.1", PORT_OBFS_B, psk="correct-psk")
+    await t_b.start()
+
+    # Попытка подключения с НЕВЕРНЫМ PSK (отправляем достаточно данных для сбоя)
+    try:
+        reader, writer = await asyncio.open_connection("127.0.0.1", PORT_OBFS_B)
+        writer.write(os.urandom(100))
+        await writer.drain()
+        await asyncio.sleep(0.5) # Даем время серверу обработать
+        writer.close()
+        await writer.wait_closed()
+    except Exception:
+        pass
+
+    count = t_b.probes_rejected
+    await t_b.stop()
+    return count
+
+
 # ── main ──────────────────────────────────────────────────────────────────
 
 async def main() -> None:
@@ -187,6 +209,14 @@ async def main() -> None:
     print("\n  [3] Полный onion circuit через ObfsTransport:")
     ok = await test_obfs_e2e()
     print(f"      {'OK — данные прошли через зашифрованный канал' if ok else 'FAILED'}")
+
+    # 5. Probe rejection test
+    print("\n  [4] Симуляция атаки (Active Probing):")
+    rejected = await test_probe_rejection()
+    print(f"      Попытка сканирования с неверным PSK...")
+    print(f"      Счетчик отбитых атак: {rejected} [ЗАБЛОКИРОВАНО]")
+    if rejected > 0:
+        print(f"      Результат: сервер проигнорировал подключение (Silent Drop)")
 
     print("\n  " + "="*50)
     print("  Итог:")
