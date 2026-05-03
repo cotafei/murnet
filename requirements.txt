@@ -1,0 +1,42 @@
+# Core cryptography
+cryptography>=42.0.0
+
+# Async networking
+aiohttp>=3.9.0
+async-timeout>=4.0.3
+websockets>=12.0
+
+# HTTP
+requests>=2.31.0
+
+# REST API
+pydantic>=2.6.0
+fastapi>=0.109.0
+uvicorn>=0.27.0
+python-multipart>=0.0.9
+
+# Async performance (Linux/macOS only)
+uvloop>=0.19.0; platform_system != "Windows"
+
+# CLI & UI
+colorama>=0.4.6
+rich>=13.7.0
+prompt_toolkit>=3.0.0
+
+# Auth
+PyJWT>=2.8.0
+
+# Utilities
+psutil>=5.9.8
+pyyaml>=6.0.1
+puremagic>=1.20,<2.0
+
+# TUI (optional — needed for demos/onion_node.py and demos/onion_chat.py)
+textual>=0.70.0
+
+# Browser (optional — needed for murnet_browser.py)
+PyQt6>=6.6.0
+PyQt6-WebEngine>=6.6.0
+
+# Build (optional — only needed for EXE packaging)
+# pyinstaller>=6.0.0
