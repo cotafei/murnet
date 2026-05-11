@@ -1,33 +1,26 @@
 """
-ObfsStream — обфускация трафика MurNet.
+ObfsStream — обфускация трафика MurNet (wire protocol v2).
 
-Для наблюдателя (DPI/провайдер) соединение выглядит как поток случайных байт:
+Для DPI соединение выглядит как поток случайных байт без TLS-сигнатуры
+(TLS-маска отключена в v2 — RKN DPI её резал на нестандартных портах).
 
-  Handshake:
-    → [Fake TLS ClientHello with SNI (vk.com/yandex.ru)]
-    → [32 байта: X25519 pubkey]
-    → [16 байт: HMAC-SHA256(PSK, pubkey)]
-    ← [Fake TLS ServerHello]
-    ← [32 байта: X25519 pubkey]
-    ← [16 байт: HMAC-SHA256(PSK, pubkey)]
+Handshake (raw X25519 + HMAC, no TLS wrapper):
+    → [32 B: X25519 pubkey] || [16 B: nonce] || [16 B: HMAC(PSK, pk || nonce || zero16)]
+    ← [32 B: X25519 pubkey] || [16 B: nonce] || [16 B: HMAC(PSK, pk || nonce || client_nonce)]
 
-    Если PSK не совпадает, сервер закрывает соединение без ответа (stealth).
-    Если SNI не передан, используется vk.com (для маскировки в РФ).
+  Server's HMAC binds client_nonce → защита от server impersonation.
+  Replay detection — на уровне ObfsTransport (передаётся через check_nonce_fn):
+  сервер запоминает виденные client_nonce в LRU-set с TTL, повтор → reject.
 
-  Фрейм данных:
-    [4 байта LE: len(ciphertext)]
-    [12 байт: случайный nonce]
-    [N байт: ChaCha20-Poly1305(payload + random_padding)]
+  Bad PSK → server adds 50–550ms random jitter, then silent close.
+  Это убирает timing distinguisher между "wrong PSK" и "slow network".
 
-    payload = [2 байта LE: data_len] + data
-    padding = os.urandom(rand 0..255)
+Frame (data):
+    [4 B LE: len(ciphertext)]    — capped at _MAX_FRAME + overhead
+    [12 B: random nonce]
+    [N B: ChaCha20-Poly1305(payload + random_padding)]
 
-  Почему это работает:
-    - Нет распознаваемого TLS ClientHello
-    - Нет JSON / текстовых заголовков
-    - Каждый фрейм уникален (новый nonce)
-    - Размеры фреймов варьируются (padding)
-    - Активный пробник не может отличить от любого AEAD-протокола
+    payload = [2 B LE: data_len] || data || urandom(0..255)
 """
 from __future__ import annotations
 
@@ -36,7 +29,7 @@ import hmac
 import hashlib
 import os
 import struct
-from typing import Optional
+from typing import Callable, Optional
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PrivateKey, X25519PublicKey,
@@ -48,6 +41,13 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 _MAX_FRAME = 65535          # максимальный размер payload
 _NONCE_LEN_HANDSHAKE = 16   # bytes — handshake replay-protection nonce
+_JITTER_MIN_S       = 0.05  # минимум timing-jitter перед silent close
+_JITTER_RANGE_S     = 0.5   # диапазон сверх минимума (итого 50–550ms)
+
+
+# C1 fix: callback тип для проверки nonce на replay
+# Передаётся в server-mode ObfsStream; возвращает True если nonce свежий.
+NonceChecker = Callable[[bytes], bool]
 
 
 class ObfsStream:
@@ -66,6 +66,7 @@ class ObfsStream:
         "_reader", "_writer", "_is_server",
         "_send_aead", "_recv_aead",
         "_psk", "_sni",
+        "_check_nonce_fn",
     )
 
     def __init__(
@@ -75,6 +76,7 @@ class ObfsStream:
         is_server: bool = False,
         psk: Optional[bytes] = None,
         sni: str = "vk.com",
+        check_nonce_fn: Optional[NonceChecker] = None,
     ) -> None:
         self._reader    = reader
         self._writer    = writer
@@ -83,6 +85,8 @@ class ObfsStream:
         self._sni       = sni
         self._send_aead: Optional[ChaCha20Poly1305] = None
         self._recv_aead: Optional[ChaCha20Poly1305] = None
+        # C1: server-side replay check (returns False if nonce already seen)
+        self._check_nonce_fn = check_nonce_fn
 
     # ── helpers ───────────────────────────────────────────────────────────
 
@@ -161,14 +165,49 @@ class ObfsStream:
             peer_nonce    = peer_data[32 : 32 + _NONCE_LEN_HANDSHAKE]
             peer_hmac     = peer_data[32 + _NONCE_LEN_HANDSHAKE :]
 
-            zero_peer_nonce = b"\x00" * _NONCE_LEN_HANDSHAKE
-            expected = self._get_hmac(self._psk, peer_pk_bytes + peer_nonce + zero_peer_nonce)
-            if not hmac.compare_digest(peer_hmac, expected):
-                # Timing-leak fix (F6): random jitter before silent close
-                # so attacker can't distinguish bad-PSK from slow-network.
-                await asyncio.sleep(0.05 + os.urandom(1)[0] / 512.0)  # 50-550ms
-                self._writer.close()
-                raise ConnectionError("PSK authentication failed (silent drop)")
+            # Server-side validation. All failures go through the same
+            # jittered close to defeat the timing distinguisher between
+            # "bad PSK", "replay", "bad pubkey" and "slow network". (W5)
+            handshake_ok = True
+            fail_reason  = "handshake failed"
+            try:
+                zero_peer_nonce = b"\x00" * _NONCE_LEN_HANDSHAKE
+                expected = self._get_hmac(
+                    self._psk, peer_pk_bytes + peer_nonce + zero_peer_nonce
+                )
+                if not hmac.compare_digest(peer_hmac, expected):
+                    handshake_ok = False
+                    fail_reason  = "handshake failed"   # don't leak "PSK" to logs (N3)
+
+                # C1: replay protection — has the server seen this nonce before?
+                if handshake_ok and self._check_nonce_fn is not None:
+                    if not self._check_nonce_fn(peer_nonce):
+                        handshake_ok = False
+                        fail_reason  = "handshake failed"  # same opaque message
+
+                # X25519 sanity check before exchange — invalid pubkey path
+                # must also go through the jitter, not fast-fail. (W5)
+                if handshake_ok:
+                    try:
+                        _peer_pk_obj = X25519PublicKey.from_public_bytes(peer_pk_bytes)
+                    except Exception:
+                        handshake_ok = False
+                        fail_reason  = "handshake failed"
+            except Exception:
+                handshake_ok = False
+
+            if not handshake_ok:
+                # W1 fix: cancellation-safe close. Always close the writer
+                # even if the sleep is cancelled by an outer wait_for timeout.
+                jitter = _JITTER_MIN_S + os.urandom(1)[0] / 256.0 * _JITTER_RANGE_S
+                try:
+                    await asyncio.sleep(jitter)
+                finally:
+                    try:
+                        self._writer.close()
+                    except Exception:
+                        pass
+                raise ConnectionError(fail_reason)
 
             # Reply with HMAC that includes peer_nonce → binds session.
             my_hmac = self._get_hmac(self._psk, my_pk + my_nonce + peer_nonce)

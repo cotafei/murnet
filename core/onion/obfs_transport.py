@@ -20,7 +20,7 @@ import asyncio
 import json
 import logging
 import time
-from collections import defaultdict, deque
+from collections import deque
 from typing import Deque, Dict, Optional
 
 from core.onion.cell      import OnionCell, is_onion_cell
@@ -36,9 +36,20 @@ _ANNOUNCE_TTL   = 4
 
 # F4 rate-limit: per-IP connection rate before handshake.
 # Защищает Guard/Middle/HS от X25519 CPU exhaustion.
-_RL_WINDOW_S    = 10.0   # окно наблюдения, сек
-_RL_MAX_CONN    = 30     # макс. новых коннектов от одного IP в окне
-_RL_BAN_S       = 60.0   # пауза после превышения лимита
+_RL_WINDOW_S         = 10.0    # окно наблюдения, сек
+_RL_MAX_CONN         = 30      # макс. новых коннектов от одного IP в окне
+_RL_BAN_S            = 60.0    # пауза после превышения лимита
+_RL_MAX_TRACKED_IPS  = 50_000  # hard cap чтобы не съесть RAM на botnet
+_RL_GC_INTERVAL_S    = 60.0    # как часто чистим записи без активности
+
+# C1: replay-protection nonce cache.
+_NONCE_TTL_S         = 300.0   # nonce помним 5 минут (timestamp/clock-skew)
+_NONCE_CACHE_CAP     = 200_000 # hard cap; LRU eviction при переполнении
+
+
+# Custom exceptions для надёжной классификации probe vs other (W3).
+class HandshakeProbeError(ConnectionError):
+    """Failed handshake from an unauthenticated peer — likely a probe/scan."""
 
 
 class ObfsTransport(OnionTransport):
@@ -68,10 +79,31 @@ class ObfsTransport(OnionTransport):
         self._obfs: Dict[str, ObfsStream] = {}
         self.probes_rejected = 0
 
-        # F4 rate-limit state
-        self._conn_history: Dict[str, Deque[float]] = defaultdict(deque)
+        # F4 rate-limit state — explicit dict (no defaultdict surprise — W4).
+        self._conn_history: Dict[str, Deque[float]] = {}
         self._banned_until: Dict[str, float]        = {}
         self.rate_limited = 0   # observability counter
+
+        # C1: replay-protection — track seen handshake nonces (server-side).
+        # Key = client_nonce bytes, value = first-seen monotonic timestamp.
+        self._seen_nonces: Dict[bytes, float] = {}
+        self.replays_rejected = 0
+
+        # GC task для C2/N5 cleanup (запускается в start()).
+        self._gc_task: Optional[asyncio.Task] = None
+
+    # ── lifecycle ─────────────────────────────────────────────────────────
+
+    async def start(self) -> None:
+        await super().start()
+        # C2 fix: запускаем GC чтобы _conn_history и _seen_nonces не росли вечно.
+        if self._gc_task is None or self._gc_task.done():
+            self._gc_task = asyncio.create_task(self._gc_loop())
+
+    async def stop(self) -> None:
+        if self._gc_task and not self._gc_task.done():
+            self._gc_task.cancel()
+        await super().stop()
 
     # ── incoming ──────────────────────────────────────────────────────────
 
@@ -86,30 +118,36 @@ class ObfsTransport(OnionTransport):
             writer.close()
             return
 
-        stream = ObfsStream(reader, writer, is_server=True, psk=self.psk, sni=self.sni)
+        stream = ObfsStream(
+            reader, writer, is_server=True, psk=self.psk, sni=self.sni,
+            check_nonce_fn=self._check_nonce,   # C1: server-side replay protection
+        )
         try:
             await asyncio.wait_for(stream.handshake(), _CONN_TIMEOUT)
+        except (asyncio.IncompleteReadError, ConnectionResetError, ConnectionError) as exc:
+            # W3 fix: classify by exception class, not message text.
+            self.probes_rejected += 1
+            logger.warning("[obfs] probe rejected from %s:%s: %s", peer[0], peer[1], exc)
+            stream.close()
+            return
         except Exception as exc:
-            # Считаем пробником любую ошибку на этапе хендшейка
-            is_probe = any(x in str(exc) for x in ["PSK", "TLS", "IncompleteRead"])
-            if is_probe or isinstance(exc, (asyncio.IncompleteReadError, ConnectionResetError)):
-                self.probes_rejected += 1
-                logger.warning("[obfs] probe rejected from %s:%s: %s", peer[0], peer[1], exc)
-            else:
-                logger.debug("[obfs] handshake failed from %s: %s", peer_id, exc)
+            logger.debug("[obfs] handshake failed from %s: %s", peer_id, exc)
             stream.close()
             return
 
         self._obfs[peer_id] = stream
         asyncio.create_task(self._obfs_read_loop(peer_id, stream, writer))
 
-    # ── F4 rate limiting ──────────────────────────────────────────────────
+    # ── F4 rate limiting + C1 replay cache + C2 GC ────────────────────────
 
     def _rate_limit_ok(self, ip: str) -> bool:
         """Token-bucket-style rate limit per source IP.
 
         Returns False if IP has exceeded _RL_MAX_CONN within the past
         _RL_WINDOW_S seconds (then IP is banned for _RL_BAN_S).
+
+        Uses setdefault — no defaultdict surprise on read (W4).
+        Hard cap _RL_MAX_TRACKED_IPS prevents memory exhaustion (C2).
         """
         now = time.monotonic()
 
@@ -120,8 +158,14 @@ class ObfsTransport(OnionTransport):
         if banned and now >= banned:
             self._banned_until.pop(ip, None)
 
-        # prune old timestamps
-        hist = self._conn_history[ip]
+        # Hard cap — if we're at capacity и это новый IP, отказываем безусловно.
+        # Это grouchy fail-closed: при OOM-attack лучше отказать новым, чем умереть.
+        if ip not in self._conn_history and len(self._conn_history) >= _RL_MAX_TRACKED_IPS:
+            logger.warning("[obfs] rate-limit tracker FULL (%d IPs), refusing new %s",
+                           _RL_MAX_TRACKED_IPS, ip)
+            return False
+
+        hist = self._conn_history.setdefault(ip, deque())
         cutoff = now - _RL_WINDOW_S
         while hist and hist[0] < cutoff:
             hist.popleft()
@@ -134,6 +178,66 @@ class ObfsTransport(OnionTransport):
 
         hist.append(now)
         return True
+
+    def _check_nonce(self, nonce: bytes) -> bool:
+        """C1: проверка handshake-nonce на replay.
+
+        Returns False если nonce уже видели за последние _NONCE_TTL_S секунд.
+        Hard cap _NONCE_CACHE_CAP с LRU eviction.
+        """
+        now = time.monotonic()
+        if nonce in self._seen_nonces:
+            self.replays_rejected += 1
+            logger.warning("[obfs] replay nonce rejected")
+            return False
+
+        # При переполнении выкидываем самые старые (LRU by timestamp).
+        if len(self._seen_nonces) >= _NONCE_CACHE_CAP:
+            # cheap eviction: drop oldest 10% to amortize.
+            drop_n = _NONCE_CACHE_CAP // 10
+            for k in sorted(self._seen_nonces, key=self._seen_nonces.get)[:drop_n]:
+                self._seen_nonces.pop(k, None)
+
+        self._seen_nonces[nonce] = now
+        return True
+
+    async def _gc_loop(self) -> None:
+        """Периодический cleanup _conn_history и _seen_nonces."""
+        try:
+            while True:
+                await asyncio.sleep(_RL_GC_INTERVAL_S)
+                self._gc_once()
+        except asyncio.CancelledError:
+            pass
+
+    def _gc_once(self) -> None:
+        now = time.monotonic()
+
+        # 1) prune _conn_history: оставляем только записи с активностью.
+        rl_cutoff = now - _RL_WINDOW_S * 2
+        empty_ips = []
+        for ip, hist in list(self._conn_history.items()):
+            while hist and hist[0] < rl_cutoff:
+                hist.popleft()
+            if not hist and ip not in self._banned_until:
+                empty_ips.append(ip)
+        for ip in empty_ips:
+            self._conn_history.pop(ip, None)
+
+        # 2) prune _banned_until: убираем истёкшие баны.
+        expired_bans = [ip for ip, until in self._banned_until.items() if until <= now]
+        for ip in expired_bans:
+            self._banned_until.pop(ip, None)
+
+        # 3) prune _seen_nonces: nonces старше TTL.
+        nonce_cutoff = now - _NONCE_TTL_S
+        old_nonces = [n for n, t in self._seen_nonces.items() if t < nonce_cutoff]
+        for n in old_nonces:
+            self._seen_nonces.pop(n, None)
+
+        if empty_ips or expired_bans or old_nonces:
+            logger.debug("[obfs] gc: dropped %d ips, %d bans, %d nonces",
+                         len(empty_ips), len(expired_bans), len(old_nonces))
 
     # ── outgoing ──────────────────────────────────────────────────────────
 
