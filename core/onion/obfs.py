@@ -46,7 +46,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 
-_MAX_FRAME = 65535   # максимальный размер payload
+_MAX_FRAME = 65535          # максимальный размер payload
+_NONCE_LEN_HANDSHAKE = 16   # bytes — handshake replay-protection nonce
 
 
 class ObfsStream:
@@ -114,58 +115,74 @@ class ObfsStream:
     # ── handshake ─────────────────────────────────────────────────────────
 
     async def handshake(self) -> None:
-        """X25519 + PSK handshake под прикрытием TLS."""
+        """X25519 + PSK handshake with replay protection (v2).
+
+        Wire (each side):
+            pubkey (32B)  ||  nonce (16B)  ||  HMAC-SHA256(PSK, pubkey || nonce || peer_nonce)[:16]
+
+        Client sends without peer_nonce (uses zeros — first message).
+        Server's HMAC binds the client's nonce → replay of a recorded
+        client message yields a fresh server response, but the attacker
+        cannot construct a new server reply, so they cannot complete an
+        active relay/impersonation.
+
+        Session keys are derived from BOTH nonces, guaranteeing
+        per-session uniqueness even when ephemeral keys collide (they
+        won't, but defense in depth).
+
+        On HMAC failure the server adds a 50-500ms random jitter before
+        closing the socket — defeats the timing distinguisher between
+        "bad PSK" and "slow network".
+        """
         priv  = X25519PrivateKey.generate()
         my_pk = priv.public_key().public_bytes_raw()
-        my_hmac = self._get_hmac(self._psk, my_pk)
+        my_nonce = os.urandom(_NONCE_LEN_HANDSHAKE)
 
         if not self._is_server:
-            # Клиент: TLS ClientHello + Pubkey + PSK-Auth
-            self._writer.write(self._make_client_hello())
-            self._writer.write(my_pk + my_hmac)
+            # Client speaks first — no peer_nonce yet, use zeros.
+            zero_peer_nonce = b"\x00" * _NONCE_LEN_HANDSHAKE
+            my_hmac = self._get_hmac(self._psk, my_pk + my_nonce + zero_peer_nonce)
+            self._writer.write(my_pk + my_nonce + my_hmac)
             await self._writer.drain()
-
-            # Читаем ServerHello (пропускаем record-слой)
-            # Мы знаем примерный размер наших фейковых записей
-            # record(5) + handshake_hdr(4) + body(38) + ccs(6) = 53
-            await self._reader.readexactly(53)
-
-            # Читаем ответные ключи
-            peer_data = await self._reader.readexactly(32 + 16)
-        else:
-            # Сервер: Читаем ClientHello (примерно 100-150 байт в зависимости от SNI)
-            # Чтобы не зависеть от точного размера, читаем заголовок рекорда
-            rec_hdr = await self._reader.readexactly(5)
-            if rec_hdr[0] != 0x16:
-                raise ValueError("Not a TLS handshake")
-            rec_len = struct.unpack(">H", rec_hdr[3:5])[0]
-            await self._reader.readexactly(rec_len)
-
-            # Читаем Pubkey + HMAC
-            peer_data = await self._reader.readexactly(32 + 16)
+            peer_data = await self._reader.readexactly(32 + _NONCE_LEN_HANDSHAKE + 16)
             peer_pk_bytes = peer_data[:32]
-            peer_hmac     = peer_data[32:]
+            peer_nonce    = peer_data[32 : 32 + _NONCE_LEN_HANDSHAKE]
+            peer_hmac     = peer_data[32 + _NONCE_LEN_HANDSHAKE :]
 
-            # ПРОВЕРКА PSK
-            if not hmac.compare_digest(peer_hmac, self._get_hmac(self._psk, peer_pk_bytes)):
-                # МОЛЧИМ И ЗАКРЫВАЕМСЯ
+            # Server's HMAC must bind OUR nonce — proves freshness.
+            expected = self._get_hmac(self._psk, peer_pk_bytes + peer_nonce + my_nonce)
+            if not hmac.compare_digest(peer_hmac, expected):
+                self._writer.close()
+                raise ConnectionError("server handshake auth failed")
+        else:
+            # Server reads first.
+            peer_data = await self._reader.readexactly(32 + _NONCE_LEN_HANDSHAKE + 16)
+            peer_pk_bytes = peer_data[:32]
+            peer_nonce    = peer_data[32 : 32 + _NONCE_LEN_HANDSHAKE]
+            peer_hmac     = peer_data[32 + _NONCE_LEN_HANDSHAKE :]
+
+            zero_peer_nonce = b"\x00" * _NONCE_LEN_HANDSHAKE
+            expected = self._get_hmac(self._psk, peer_pk_bytes + peer_nonce + zero_peer_nonce)
+            if not hmac.compare_digest(peer_hmac, expected):
+                # Timing-leak fix (F6): random jitter before silent close
+                # so attacker can't distinguish bad-PSK from slow-network.
+                await asyncio.sleep(0.05 + os.urandom(1)[0] / 512.0)  # 50-550ms
                 self._writer.close()
                 raise ConnectionError("PSK authentication failed (silent drop)")
 
-            # Если ок — отвечаем своим TLS + Pubkey + HMAC
-            self._writer.write(self._make_server_hello())
-            self._writer.write(my_pk + my_hmac)
+            # Reply with HMAC that includes peer_nonce → binds session.
+            my_hmac = self._get_hmac(self._psk, my_pk + my_nonce + peer_nonce)
+            self._writer.write(my_pk + my_nonce + my_hmac)
             await self._writer.drain()
 
-        peer_pk_bytes = peer_data[:32]
         peer_pk = X25519PublicKey.from_public_bytes(peer_pk_bytes)
         shared  = priv.exchange(peer_pk)
 
-        # Детерминированная соль из обоих pubkey-ов
+        # KDF salt includes both nonces → per-session uniqueness.
         if not self._is_server:
-            salt = my_pk + peer_pk_bytes
+            salt = my_pk + peer_pk_bytes + my_nonce + peer_nonce
         else:
-            salt = peer_pk_bytes + my_pk
+            salt = peer_pk_bytes + my_pk + peer_nonce + my_nonce
 
         def _derive(info: bytes) -> bytes:
             return HKDF(
@@ -175,9 +192,10 @@ class ObfsStream:
                 info=info,
             ).derive(shared)
 
-        # Два разных ключа для каждого направления
-        key_c2s = _derive(b"murnet-obfs-v1-c2s")
-        key_s2c = _derive(b"murnet-obfs-v1-s2c")
+        # Bumped info constants → v2 protocol; v1 peers can't decrypt v2 cells
+        # (intentional — forces simultaneous upgrade, no silent fallback).
+        key_c2s = _derive(b"murnet-obfs-v2-c2s")
+        key_s2c = _derive(b"murnet-obfs-v2-s2c")
 
         if not self._is_server:
             self._send_aead = ChaCha20Poly1305(key_c2s)
@@ -207,6 +225,9 @@ class ObfsStream:
         assert self._recv_aead, "handshake not done"
         hdr      = await self._reader.readexactly(4)
         ct_len   = struct.unpack("<I", hdr)[0]
+        # F10 fix: cap frame size to prevent memory-bomb DoS
+        if ct_len > _MAX_FRAME + 17:   # +12 (nonce) +16 (tag) +pad +len_hdr
+            raise ValueError(f"frame too large: {ct_len} > {_MAX_FRAME}")
         nonce    = await self._reader.readexactly(12)
         ct       = await self._reader.readexactly(ct_len)
         plain    = self._recv_aead.decrypt(nonce, ct, None)

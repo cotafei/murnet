@@ -19,7 +19,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Dict, Optional
+import time
+from collections import defaultdict, deque
+from typing import Deque, Dict, Optional
 
 from core.onion.cell      import OnionCell, is_onion_cell
 from core.onion.directory import RelayDirectory, RelayInfo
@@ -31,6 +33,12 @@ logger = logging.getLogger("murnet.obfs_transport")
 
 _ANNOUNCE_EVERY = 30.0
 _ANNOUNCE_TTL   = 4
+
+# F4 rate-limit: per-IP connection rate before handshake.
+# Защищает Guard/Middle/HS от X25519 CPU exhaustion.
+_RL_WINDOW_S    = 10.0   # окно наблюдения, сек
+_RL_MAX_CONN    = 30     # макс. новых коннектов от одного IP в окне
+_RL_BAN_S       = 60.0   # пауза после превышения лимита
 
 
 class ObfsTransport(OnionTransport):
@@ -60,12 +68,23 @@ class ObfsTransport(OnionTransport):
         self._obfs: Dict[str, ObfsStream] = {}
         self.probes_rejected = 0
 
+        # F4 rate-limit state
+        self._conn_history: Dict[str, Deque[float]] = defaultdict(deque)
+        self._banned_until: Dict[str, float]        = {}
+        self.rate_limited = 0   # observability counter
+
     # ── incoming ──────────────────────────────────────────────────────────
 
     async def _on_accept(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         peer = writer.get_extra_info("peername")
         peer_id = f"{peer[0]}:{peer[1]}"
         logger.debug("[obfs] accept %s", peer_id)
+
+        # F4: rate-limit BEFORE handshake (X25519 ECDH is the expensive part).
+        if not self._rate_limit_ok(peer[0]):
+            self.rate_limited += 1
+            writer.close()
+            return
 
         stream = ObfsStream(reader, writer, is_server=True, psk=self.psk, sni=self.sni)
         try:
@@ -83,6 +102,38 @@ class ObfsTransport(OnionTransport):
 
         self._obfs[peer_id] = stream
         asyncio.create_task(self._obfs_read_loop(peer_id, stream, writer))
+
+    # ── F4 rate limiting ──────────────────────────────────────────────────
+
+    def _rate_limit_ok(self, ip: str) -> bool:
+        """Token-bucket-style rate limit per source IP.
+
+        Returns False if IP has exceeded _RL_MAX_CONN within the past
+        _RL_WINDOW_S seconds (then IP is banned for _RL_BAN_S).
+        """
+        now = time.monotonic()
+
+        # ban window check
+        banned = self._banned_until.get(ip)
+        if banned and now < banned:
+            return False
+        if banned and now >= banned:
+            self._banned_until.pop(ip, None)
+
+        # prune old timestamps
+        hist = self._conn_history[ip]
+        cutoff = now - _RL_WINDOW_S
+        while hist and hist[0] < cutoff:
+            hist.popleft()
+
+        if len(hist) >= _RL_MAX_CONN:
+            self._banned_until[ip] = now + _RL_BAN_S
+            logger.warning("[obfs] rate-limit ban %s for %ds (was %d conns in %.1fs)",
+                           ip, int(_RL_BAN_S), len(hist), _RL_WINDOW_S)
+            return False
+
+        hist.append(now)
+        return True
 
     # ── outgoing ──────────────────────────────────────────────────────────
 
