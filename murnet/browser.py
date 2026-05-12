@@ -22,7 +22,7 @@ import threading
 
 # ── VDS endpoints (real production) ───────────────────────────────────────
 _PROXY_PORT  = 18888
-_VDS_IP      = "80.93.52.15"
+_VDS_IP      = ""
 _VDS_GUARD   = 9211
 _VDS_MIDDLE  = 9212
 _VDS_HS      = 9213
