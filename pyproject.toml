@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "murnet"
-version = "6.2.2"
+version = "6.2.3"
 description = "Decentralized P2P network with onion routing, DHT and VPN tunnel"
 readme = "README.md"
 license = { text = "MIT" }

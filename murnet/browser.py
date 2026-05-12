@@ -44,10 +44,10 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore    import QWebEngineProfile, QWebEngineSettings
 
-from core.onion.router          import OnionRouter
-from core.onion.obfs_transport  import ObfsTransport as OnionTransport
-from core.onion.hidden_service  import HiddenServiceDirectory
-from core.onion.hs_client       import HiddenServiceClient
+from murnet.core.onion.router          import OnionRouter
+from murnet.core.onion.obfs_transport  import ObfsTransport as OnionTransport
+from murnet.core.onion.hidden_service  import HiddenServiceDirectory
+from murnet.core.onion.hs_client       import HiddenServiceClient
 
 # ── HTML-шаблоны ──────────────────────────────────────────────────────────
 
