@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "murnet"
-version = "6.2.1"
+version = "6.2.2"
 description = "Decentralized P2P network with onion routing, DHT and VPN tunnel"
 readme = "README.md"
 license = { text = "MIT" }
@@ -62,6 +62,7 @@ murnet         = "murnet.cli:main"
 murnet-node    = "murnet.demos.onion_node:main"
 murnet-vpn     = "murnet.demos.vpn_client:main"
 murnet-desktop = "murnet.desktop_app:main"
+murnet-browser = "murnet.browser:main"
 
 [tool.setuptools.packages.find]
 where   = ["."]
