@@ -10,6 +10,7 @@ import asyncio
 import ipaddress
 import logging
 import os
+import socket
 import struct
 import time
 from dataclasses import dataclass
@@ -118,11 +119,25 @@ async def _query_once(
     pkt, txn_id = _build_request()
     fut: asyncio.Future[tuple[str, int]] = loop.create_future()
 
+    # Resolve hostname first — Windows rejects unresolved names in create_datagram_endpoint
+    # when local_addr is also specified.
+    try:
+        infos = await loop.getaddrinfo(
+            server_host, server_port,
+            type=socket.SOCK_DGRAM,
+        )
+        if not infos:
+            return None
+        resolved_ip = infos[0][4][0]
+    except OSError as exc:
+        logger.debug("STUN DNS %s: %s", server_host, exc)
+        return None
+
     try:
         transport, _ = await loop.create_datagram_endpoint(
             lambda: _Proto(txn_id, fut),
             local_addr=("0.0.0.0", local_port),
-            remote_addr=(server_host, server_port),
+            remote_addr=(resolved_ip, server_port),
         )
     except OSError as exc:
         logger.debug("STUN bind/connect %s:%d local %d: %s",
