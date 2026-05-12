@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 # ─────────────────────────────────────────────────────────────────
 
 def _make_node(port=0):
-    from core.node.node import SecureMurnetNode
+    from murnet.core.node.node import SecureMurnetNode
     d = tempfile.mkdtemp(prefix='murnet_integ_')
     node = SecureMurnetNode(data_dir=d, port=port)
     node.start()

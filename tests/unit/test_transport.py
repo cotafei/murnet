@@ -16,11 +16,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.net.transport import (
+from murnet.core.net.transport import (
     Transport, PacketType, PacketHeader, PeerConnection,
     RateLimiter
 )
-from core.identity.crypto import Identity
+from murnet.core.identity.crypto import Identity
 
 
 @pytest.fixture

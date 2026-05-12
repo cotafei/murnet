@@ -5,7 +5,7 @@ import json
 import os
 import tempfile
 import pytest
-from core.vpn.config import VPNConfig, Inbound, Outbound, MurnetPeer, RoutingRule, _is_private
+from murnet.core.vpn.config import VPNConfig, Inbound, Outbound, MurnetPeer, RoutingRule, _is_private
 
 
 MINIMAL_CLIENT = {

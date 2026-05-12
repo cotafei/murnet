@@ -11,7 +11,7 @@ import time
 import hmac
 import pytest
 
-import core.net.network_auth as na
+import murnet.core.net.network_auth as na
 
 
 # ---------------------------------------------------------------------------

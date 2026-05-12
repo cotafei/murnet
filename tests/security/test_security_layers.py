@@ -21,9 +21,9 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-import core.net.network_auth as na
-import core.integrity as integ
-from core.integrity import TamperedBuildError
+import murnet.core.net.network_auth as na
+import murnet.core.integrity as integ
+from murnet.core.integrity import TamperedBuildError
 
 
 # ===========================================================================
@@ -38,7 +38,7 @@ class TestTransportNetworkAuth:
 
     @pytest.fixture()
     def transport(self):
-        from core.net.transport import Transport
+        from murnet.core.net.transport import Transport
         t = Transport(port=0)
         t._node_address = "test_node"
         t._public_key   = os.urandom(32)

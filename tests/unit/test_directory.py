@@ -4,7 +4,7 @@ Unit tests for core/onion/directory.py — RelayInfo + RelayDirectory.
 import time
 import pytest
 
-from core.onion.directory import RelayDirectory, RelayInfo
+from murnet.core.onion.directory import RelayDirectory, RelayInfo
 
 
 # ─────────────────────────────────────────────────────────────────────────────

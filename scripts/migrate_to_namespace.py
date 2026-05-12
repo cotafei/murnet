@@ -6,13 +6,13 @@
     2. Перемещает core/, api/, mobile/, vds/, vpn/, demos/, cli.py, desktop_app.py,
        murnet_vpn.py, network_viz.py, build_exe.py в murnet/
     3. Во ВСЕХ .py-файлах (включая tests/) заменяет импорты:
-         from core.X          -> from murnet.core.X
-         from api.X           -> from murnet.api.X
-         from mobile.X        -> from murnet.mobile.X
-         from vds.X           -> from murnet.vds.X
-         from vpn.X           -> from murnet.vpn.X
-         from demos.X         -> from murnet.demos.X
-         import core.X        -> import murnet.core.X
+         from murnet.core.X          -> from murnet.core.X
+         from murnet.api.X           -> from murnet.api.X
+         from murnet.mobile.X        -> from murnet.mobile.X
+         from murnet.vds.X           -> from murnet.vds.X
+         from murnet.vpn.X           -> from murnet.vpn.X
+         from murnet.demos.X         -> from murnet.demos.X
+         import murnet.core.X        -> import murnet.core.X
          (и аналогично для прочих верхне-уровневых пакетов)
     4. Корневой __init__.py не нужен (он сейчас пустой, удаляется)
 

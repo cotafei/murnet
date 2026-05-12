@@ -26,10 +26,10 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.net.transport import Transport, PacketType, PacketHeader, PeerConnection, RateLimiter
-from core.net.routing import RoutingTable, LinkStateDatabase, LSA, Link, LinkState, DijkstraEngine
-from core.identity.crypto import Identity
-from core.net.murnaked import MurnakedNode
+from murnet.core.net.transport import Transport, PacketType, PacketHeader, PeerConnection, RateLimiter
+from murnet.core.net.routing import RoutingTable, LinkStateDatabase, LSA, Link, LinkState, DijkstraEngine
+from murnet.core.identity.crypto import Identity
+from murnet.core.net.murnaked import MurnakedNode
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -538,7 +538,7 @@ class TestRoutingTable:
         assert bad.address not in rt.paths
 
     def test_ecmp_cycles_through_hops(self, identity):
-        from core.net.routing import Path
+        from murnet.core.net.routing import Path
         rt = RoutingTable(identity.address, identity)
         a1, a2 = Identity(), Identity()
         dest = Identity()
@@ -613,7 +613,7 @@ class TestNodeNameService:
 
     @pytest.fixture
     def node(self, data_dir):
-        from core.node.node import SecureMurnetNode
+        from murnet.core.node.node import SecureMurnetNode
         n = SecureMurnetNode(data_dir=data_dir, port=0)
         n.start()
         yield n

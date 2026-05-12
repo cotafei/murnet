@@ -5,7 +5,7 @@ import sys
 import time
 
 sys.path.insert(0, ".")
-from core.onion.obfs import ObfsStream
+from murnet.core.onion.obfs import ObfsStream
 
 
 async def run():

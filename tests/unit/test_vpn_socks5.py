@@ -9,7 +9,7 @@ import struct
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.vpn.socks5 import Socks5Server, _ATYP_IPV4, _ATYP_DOMAIN, _ATYP_IPV6
+from murnet.core.vpn.socks5 import Socks5Server, _ATYP_IPV4, _ATYP_DOMAIN, _ATYP_IPV6
 
 _read_address = Socks5Server._read_address
 
@@ -180,7 +180,7 @@ class TestSocks5Handshake:
 
     def test_successful_connect_sends_ok_reply(self):
         """When tunnel.connect succeeds, reply REP=0x00."""
-        from core.vpn.tunnel import Circuit, CircuitState
+        from murnet.core.vpn.tunnel import Circuit, CircuitState
 
         circuit = Circuit(id="c1", dst_host="example.com", dst_port=443,
                           exit_peer="ep", state=CircuitState.CONNECTED)

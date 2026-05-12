@@ -6,14 +6,14 @@ import json
 import os
 import pytest
 
-from core.onion.cell import OnionCell, OnionCmd, is_onion_cell, ONION_VERSION
-from core.onion.hop_key import (
+from murnet.core.onion.cell import OnionCell, OnionCmd, is_onion_cell, ONION_VERSION
+from murnet.core.onion.hop_key import (
     generate_ephemeral_keypair,
     derive_hop_key,
     hop_encrypt,
     hop_decrypt,
 )
-from core.onion.circuit import (
+from murnet.core.onion.circuit import (
     HopState,
     CircuitOrigin,
     RelayEntry,
@@ -217,7 +217,7 @@ class TestWrapForward:
 
     def _make_circuit(self, n_hops: int):
         """Build a CircuitOrigin with n random keys."""
-        from core.onion.router import OnionRouter
+        from murnet.core.onion.router import OnionRouter
         c = CircuitOrigin()
         for i in range(n_hops):
             priv, pub = generate_ephemeral_keypair()
@@ -228,7 +228,7 @@ class TestWrapForward:
 
     def _peel(self, circuit: CircuitOrigin, payload: bytes) -> bytes:
         """Simulate each relay peeling its layer."""
-        from core.onion.router import OnionRouter
+        from murnet.core.onion.router import OnionRouter
         data = payload
         for i, hop in enumerate(circuit.hops):
             data = hop_decrypt(hop.key, data)
@@ -240,7 +240,7 @@ class TestWrapForward:
         return data  # innermost plaintext
 
     def test_1_hop(self):
-        from core.onion.router import OnionRouter
+        from murnet.core.onion.router import OnionRouter
         r = OnionRouter("orig")
         c = self._make_circuit(1)
         r._circuit_index = {}
@@ -250,7 +250,7 @@ class TestWrapForward:
         assert json.loads(result)["cmd"] == "RELAY_DATA"
 
     def test_3_hops(self):
-        from core.onion.router import OnionRouter
+        from murnet.core.onion.router import OnionRouter
         r = OnionRouter("orig")
         c = self._make_circuit(3)
         cmd = json.dumps({"cmd": "RELAY_DATA", "data": "test"}).encode()
@@ -259,7 +259,7 @@ class TestWrapForward:
         assert json.loads(result)["data"] == "test"
 
     def test_5_hops(self):
-        from core.onion.router import OnionRouter
+        from murnet.core.onion.router import OnionRouter
         r = OnionRouter("orig")
         c = self._make_circuit(5)
         cmd = json.dumps({"cmd": "RELAY_DATA", "data": "deep"}).encode()
@@ -268,7 +268,7 @@ class TestWrapForward:
 
     def test_each_layer_uses_correct_key(self):
         """Verify that using wrong key at any hop fails."""
-        from core.onion.router import OnionRouter
+        from murnet.core.onion.router import OnionRouter
         r  = OnionRouter("orig")
         c  = self._make_circuit(3)
         bad = CircuitOrigin()

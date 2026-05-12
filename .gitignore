@@ -216,6 +216,16 @@ docs/*.doc
 # Build signatures and runtime artefacts
 BUILD_SIGNATURE
 *.log
+*.err
+*.out
+
+# Runtime state (local peers, VDS endpoints — never publish)
+.murnet_peers.json
+.murnet_vds.json
+.murnet_*.json
+
+# Claude Code agent workspace
+.claude/
 
 # Obsidian / internal project notes (not for public repo)
 MURNET.md

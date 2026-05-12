@@ -13,8 +13,8 @@ import time
 
 import pytest
 
-from core.data.objects import MurObject, ObjectStore, MAX_OBJECT_SIZE
-from core.node.pubsub import PubSubManager, topic_id
+from murnet.core.data.objects import MurObject, ObjectStore, MAX_OBJECT_SIZE
+from murnet.core.node.pubsub import PubSubManager, topic_id
 
 
 # ---------------------------------------------------------------------------
