@@ -1,8 +1,15 @@
-# MurNet
+<div align="center">
+  <img src="assets/icons/logo.svg" width="120" alt="MurNet logo" />
+  <h1>MurNet</h1>
+  <p>Децентрализованная P2P-сеть с onion-маршрутизацией, DHT и VPN-туннелем</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)](docs/ARCHITECTURE.md)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+  [![PyPI](https://img.shields.io/pypi/v/murnet.svg)](https://pypi.org/project/murnet/)
+  [![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)](docs/ARCHITECTURE.md)
+</div>
+
+---
 
 **MurNet** — экспериментальная децентрализованная P2P-сеть с onion-маршрутизацией, DHT и VPN-туннелем.
 

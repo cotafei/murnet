@@ -1,6 +1,6 @@
 """MurNet — decentralized onion-routed P2P network."""
 
-__version__ = "6.2.0"
+__version__ = "6.2.3"
 __author__ = "MurNet Dev"
 
 from murnet.core.identity.crypto import (
