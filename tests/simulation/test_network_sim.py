@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from core.node.node import SecureMurnetNode
+from murnet.core.node.node import SecureMurnetNode
 
 
 # ---------------------------------------------------------------------------

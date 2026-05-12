@@ -12,8 +12,8 @@ import shutil
 import pytest
 from pathlib import Path
 
-import core.integrity as integ
-from core.integrity import TamperedBuildError, _compute_manifest, _load_signature
+import murnet.core.integrity as integ
+from murnet.core.integrity import TamperedBuildError, _compute_manifest, _load_signature
 
 
 # ---------------------------------------------------------------------------

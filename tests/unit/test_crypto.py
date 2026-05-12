@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.identity.crypto import (
+from murnet.core.identity.crypto import (
     Identity, KeyPair, E2EEncryption, SecureChannel,
     blake2b_hash, constant_time_compare, secure_random_bytes,
     base58_encode, base58_decode, canonical_json,

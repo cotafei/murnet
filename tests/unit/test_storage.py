@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.data.storage import Storage, StorageConfig, LRUCache
-from core.identity.crypto import Identity
+from murnet.core.data.storage import Storage, StorageConfig, LRUCache
+from murnet.core.identity.crypto import Identity
 
 
 @pytest.fixture

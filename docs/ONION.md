@@ -91,9 +91,51 @@ Gossip-анонс relay-ноды:
 
 ## NAT Traversal
 
-Relay-ноды на VDS имеют открытые порты. Alice/Bob на ноутбуке — нет.
+При запуске `OnionTransport.start()` выполняется трёхшаговое определение публичного адреса:
 
-Решение: ответы всегда идут **по тому же TCP-соединению**, которое инициировал клиент.
+### Шаг 1 — UPnP (IGD)
+
+Нода отправляет SSDP M-SEARCH на `239.255.255.250:1900`. Если домашний роутер
+ответил за 3 сек — запрашивается `AddPortMapping` через SOAP. При успехе:
+
+```
+public_addr = f"{router_external_ip}:{bind_port}"
+nat_type    = "open"
+upnp_active = True   # DeletePortMapping вызовется при stop()
+```
+
+При завершении работы `stop()` автоматически вызывает `DeletePortMapping`.
+
+### Шаг 2 — STUN (если UPnP недоступен)
+
+Отправляются два Binding Request (RFC 5389) на `stun.l.google.com:19302`
+(и другие из списка) с разных локальных портов.
+
+| Результат | `nat_type` | Описание |
+|---|---|---|
+| public_port == bind_port | `open` | Нет NAT или 1:1 (VDS) |
+| оба запроса → одинаковый порт | `cone` | Port-preserving NAT, доступен снаружи |
+| разные публичные порты | `symmetric` | Симметричный NAT, недоступен |
+| нет ответа | `blocked` | Firewall или STUN недоступен |
+
+При `open` или `cone`:
+```
+public_addr = f"{stun_public_ip}:{stun_public_port}"
+```
+
+### Шаг 3 — client-only fallback
+
+Если ни UPnP, ни STUN не дали достижимого адреса (`symmetric` / `blocked`):
+```
+public_addr = None
+```
+Нода работает в **client-only** режиме: подключается к relay-нодам как клиент,
+но не анонсирует себя как relay через gossip.
+
+### Входящие соединения (пассивный NAT)
+
+Клиенты за NAT получают ответы даже без UPnP/STUN: ответы всегда идут
+**по тому же TCP-соединению**, которое инициировал клиент.
 Guard никогда не открывает новое соединение к Alice — только отвечает на входящее.
 
 ```
@@ -101,6 +143,9 @@ Alice → [открывает TCP] → Guard:9001
 Guard: сохраняет writer в _inc["Alice-addr"]
 Guard → [пишет в тот же writer] → Alice
 ```
+
+> **VDS-ноды:** UPnP не нужен и не работает. STUN корректно определяет `open`
+> (публичный IP == внешний IP), `public_addr` устанавливается автоматически.
 
 ---
 
@@ -130,7 +175,9 @@ Middle →  announce(Middle) →  Exit
 | `core/onion/hop_key.py` | X25519 + HKDF + AES-256-GCM |
 | `core/onion/circuit.py` | `CircuitOrigin`, `RelayEntry`, `CircuitManager` |
 | `core/onion/router.py` | `OnionRouter` — логика CREATE/EXTEND/RELAY |
-| `core/onion/transport.py` | `OnionTransport` — TCP + NAT + gossip |
+| `core/onion/transport.py` | `OnionTransport` — TCP + UPnP/STUN NAT + gossip |
+| `core/net/stun.py` | `StunClient` — RFC 5389 public IP/port + NAT type detection |
+| `core/net/upnp.py` | `UPnPClient` — IGD SSDP/SOAP port mapping |
 | `core/onion/directory.py` | `RelayDirectory` — реестр известных relay-нод |
 | `api/onion_api.py` | Лёгкий HTTP API для relay-нод |
 | `demos/onion_node.py` | Relay-нода или chat-участник (CLI) |

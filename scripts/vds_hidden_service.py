@@ -23,12 +23,12 @@ from threading import Thread
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from core.onion.router          import OnionRouter
-from core.onion.obfs_transport  import ObfsTransport as OnionTransport
-from core.onion.hidden_service  import (
+from murnet.core.onion.router          import OnionRouter
+from murnet.core.onion.obfs_transport  import ObfsTransport as OnionTransport
+from murnet.core.onion.hidden_service  import (
     HiddenServiceIdentity, HiddenServiceAnnounce, HiddenServiceDirectory,
 )
-from core.onion.hs_router     import HiddenServiceRouter
+from murnet.core.onion.hs_router     import HiddenServiceRouter
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(name)s %(levelname)s  %(message)s")

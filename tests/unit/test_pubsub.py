@@ -7,8 +7,8 @@ import os
 import time
 import pytest
 
-from core.node.pubsub import PubSubManager, topic_id, _DEFAULT_TTL
-from core.data.objects import MurObject, ObjectStore
+from murnet.core.node.pubsub import PubSubManager, topic_id, _DEFAULT_TTL
+from murnet.core.data.objects import MurObject, ObjectStore
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ class TestSubscribe:
         assert topic_id("room-a") not in psm.subscription_topics()
 
     def test_too_many_subscribers_raises(self, tmp_path):
-        from core.node.pubsub import _MAX_SUBS_PER_TOPIC
+        from murnet.core.node.pubsub import _MAX_SUBS_PER_TOPIC
         psm = _psm(tmp_path)
         for i in range(_MAX_SUBS_PER_TOPIC):
             psm.subscribe("flood", lambda t, o, i=i: i)

@@ -17,8 +17,8 @@ import json
 import os
 import pytest
 
-from core.onion.cell import OnionCell, OnionCmd
-from core.onion.router import OnionRouter
+from murnet.core.onion.cell import OnionCell, OnionCmd
+from murnet.core.onion.router import OnionRouter
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ async def test_privacy_guard_cannot_read_exit_traffic(routers_3hop):
     guard_entry = r["guard"]._relays.get(circuit.hops[0].circuit_id)
     assert guard_entry is not None
 
-    from core.onion.hop_key import hop_decrypt, hop_encrypt
+    from murnet.core.onion.hop_key import hop_decrypt, hop_encrypt
     secret_msg = b"TOP SECRET - guard should not see this"
     await r["orig"].send_data(circuit, "s1", secret_msg)
 

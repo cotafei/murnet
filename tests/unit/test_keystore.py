@@ -8,14 +8,14 @@ Run with:
 import os
 import pytest
 
-from core.identity.keystore import (
+from murnet.core.identity.keystore import (
     EncryptedKeystore,
     WrongPasswordError,
     WeakPasswordError,
     KeystoreNotFoundError,
     KeystoreError,
 )
-from core.identity.crypto import Identity
+from murnet.core.identity.crypto import Identity
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ class TestKeystoreSecurityHardening:
     def test_v1_migration_in_memory(self, tmp_path, identity_bytes):
         """_migrate_v1_to_v2 must reassemble nonce+ciphertext correctly."""
         import json, base64
-        from core.identity.crypto import derive_key_argon2, secure_random_bytes
+        from murnet.core.identity.crypto import derive_key_argon2, secure_random_bytes
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
         store = EncryptedKeystore(str(tmp_path))

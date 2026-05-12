@@ -13,11 +13,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.net.routing import (
+from murnet.core.net.routing import (
     RoutingTable, LinkStateDatabase, DijkstraEngine,
     Link, LSA, Path, LinkState
 )
-from core.identity.crypto import Identity
+from murnet.core.identity.crypto import Identity
 
 
 @pytest.fixture

@@ -1,0 +1,15 @@
+[Unit]
+Description=MurNet Hidden Service (Guard 9211 + HS 9213)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/murnet
+ExecStart=/usr/bin/python3 -u /root/murnet/vds_hidden_service.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/murnet-hs.log
+StandardError=append:/var/log/murnet-hs.log
+
+[Install]
+WantedBy=multi-user.target

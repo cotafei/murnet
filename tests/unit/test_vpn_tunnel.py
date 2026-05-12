@@ -7,7 +7,7 @@ import os
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
-from core.vpn.tunnel import TunnelManager, Circuit, CircuitState, _CONNECT_TIMEOUT
+from murnet.core.vpn.tunnel import TunnelManager, Circuit, CircuitState, _CONNECT_TIMEOUT
 
 
 # ---------------------------------------------------------------------------

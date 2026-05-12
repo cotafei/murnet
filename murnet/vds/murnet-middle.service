@@ -1,0 +1,15 @@
+[Unit]
+Description=MurNet Middle Relay (port 9212)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/murnet
+ExecStart=/usr/bin/python3 -u /root/murnet/vds_middle_relay.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/murnet-middle.log
+StandardError=append:/var/log/murnet-middle.log
+
+[Install]
+WantedBy=multi-user.target

@@ -16,7 +16,7 @@ class TestFullNodeLifecycle:
     
     def test_node_start_stop(self, fresh_data_dir):
         """Запуск и остановка узла"""
-        from core.node.node import MurnetNode
+        from murnet.core.node.node import MurnetNode
         
         node = MurnetNode(data_dir=fresh_data_dir, port=0)
         node.start()
@@ -36,7 +36,7 @@ class TestFullNodeLifecycle:
         
         node1 = node2 = None
         try:
-            from core.node.node import MurnetNode
+            from murnet.core.node.node import MurnetNode
             node1 = MurnetNode(data_dir=dir1, port=0)
             node2 = MurnetNode(data_dir=dir2, port=0)
 

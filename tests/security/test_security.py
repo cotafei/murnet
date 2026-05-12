@@ -15,11 +15,11 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.identity.crypto import Identity, E2EEncryption, ValidationError, SecurityError
-from core.net.transport import Transport, PacketType, RateLimiter
-from core.net.routing import RoutingTable, LSA, LinkStateDatabase
-from core.net.dht_rpc import DHTAuthManager, DHTRequest
-from core.node.node import SecureMurnetNode
+from murnet.core.identity.crypto import Identity, E2EEncryption, ValidationError, SecurityError
+from murnet.core.net.transport import Transport, PacketType, RateLimiter
+from murnet.core.net.routing import RoutingTable, LSA, LinkStateDatabase
+from murnet.core.net.dht_rpc import DHTAuthManager, DHTRequest
+from murnet.core.node.node import SecureMurnetNode
 
 
 @pytest.fixture
@@ -144,7 +144,7 @@ class TestTransportSecurity:
     
     def test_replay_protection_sequence_numbers(self, fresh_data_dir):
         """Защита от replay через sequence numbers"""
-        from core.net.transport import PeerConnection
+        from murnet.core.net.transport import PeerConnection
         
         peer = PeerConnection(addr=('127.0.0.1', 8888), address='test')
         
@@ -164,7 +164,7 @@ class TestTransportSecurity:
         transport = Transport(port=0)
         
         # Слишком старый timestamp
-        from core.net.transport import PacketHeader, PacketType
+        from murnet.core.net.transport import PacketHeader, PacketType
         
         old_header = PacketHeader(
             packet_type=PacketType.DATA,
@@ -338,7 +338,7 @@ class TestNodeSecurity:
     
     def test_circuit_breaker_blocks_under_load(self, fresh_data_dir):
         """Circuit breaker блокирует при перегрузке"""
-        from core.node.node import CircuitBreaker
+        from murnet.core.node.node import CircuitBreaker
         
         cb = CircuitBreaker(failure_threshold=3, recovery_timeout=1.0)
         
@@ -360,7 +360,7 @@ class TestNodeSecurity:
     
     def test_backpressure_throttling(self, fresh_data_dir):
         """Backpressure дросселирует нагрузку"""
-        from core.node.node import BackpressureController
+        from murnet.core.node.node import BackpressureController
         
         bp = BackpressureController(high_watermark=0.8, low_watermark=0.3)
         
@@ -432,7 +432,7 @@ class TestDoSProtection:
     
     def test_memory_exhaustion_protection(self, fresh_data_dir):
         """Защита от исчерпания памяти"""
-        from core.net.murnaked import BloomFilter
+        from murnet.core.net.murnaked import BloomFilter
         
         # Bloom filter с разумным размером
         bloom = BloomFilter(size=10000, hash_count=5)
@@ -451,7 +451,7 @@ class TestSideChannelProtection:
     
     def test_constant_time_comparison(self):
         """Сравнение в постоянное время"""
-        from core.identity.crypto import constant_time_compare
+        from murnet.core.identity.crypto import constant_time_compare
         
         # Одинаковые данные
         a = b'secret-data-12345'
@@ -537,7 +537,7 @@ class TestAuthorization:
     def test_permission_enforcement(self, fresh_data_dir):
         """Принудительное применение прав"""
         # Проверяем что API требует правильных permissions
-        from api.auth import AuthManager
+        from murnet.api.auth import AuthManager
         
         auth = AuthManager()
         

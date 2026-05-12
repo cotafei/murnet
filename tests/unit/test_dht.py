@@ -13,11 +13,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.net.murnaked import (
+from murnet.core.net.murnaked import (
     EnhancedMurnakedStorage, ConsistentHashRing, VirtualNode,
     StorageEntry, BloomFilter, HintedHandoff
 )
-from core.identity.crypto import Identity
+from murnet.core.identity.crypto import Identity
 
 
 @pytest.fixture

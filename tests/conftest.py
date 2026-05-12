@@ -51,14 +51,14 @@ def sample_keys():
 @pytest.fixture
 def identity():
     """Тестовая идентичность"""
-    from core.identity.crypto import Identity
+    from murnet.core.identity.crypto import Identity
     return Identity()
 
 
 @pytest.fixture
 def murnaked(fresh_data_dir, identity):
     """DHT хранилище для тестов"""
-    from core.net.murnaked import EnhancedMurnakedStorage
+    from murnet.core.net.murnaked import EnhancedMurnakedStorage
     storage = EnhancedMurnakedStorage(
         node_address=identity.address,
         data_dir=fresh_data_dir,
@@ -71,28 +71,28 @@ def murnaked(fresh_data_dir, identity):
 @pytest.fixture
 def hash_ring():
     """Чистое кольцо хеширования"""
-    from core.net.murnaked import ConsistentHashRing
+    from murnet.core.net.murnaked import ConsistentHashRing
     return ConsistentHashRing(vnodes_per_node=10)
 
 
 @pytest.fixture
 def routing_table(identity):
     """Таблица маршрутизации"""
-    from core.net.routing import RoutingTable
+    from murnet.core.net.routing import RoutingTable
     return RoutingTable(identity.address, identity)
 
 
 @pytest.fixture
 def lsdb(identity):
     """Link-state database"""
-    from core.net.routing import LinkStateDatabase
+    from murnet.core.net.routing import LinkStateDatabase
     return LinkStateDatabase(identity.address, identity)
 
 
 @pytest.fixture
 def storage(fresh_data_dir):
     """Хранилище для тестов"""
-    from core.data.storage import Storage, StorageConfig
+    from murnet.core.data.storage import Storage, StorageConfig
     config = StorageConfig(
         data_dir=fresh_data_dir,
         max_size_mb=100,
@@ -108,8 +108,8 @@ def storage(fresh_data_dir):
 @pytest.fixture
 def transport_pair(fresh_data_dir):
     """Пара транспортов для тестирования"""
-    from core.net.transport import Transport
-    from core.identity.crypto import Identity
+    from murnet.core.net.transport import Transport
+    from murnet.core.identity.crypto import Identity
     import time
     
     identity1 = Identity()
@@ -148,7 +148,7 @@ def mock_battery_critical():
 def mock_wifi_network():
     """Мок WiFi сети"""
     with patch('mobile.network.MobileNetworkManager._detect_network_type') as mock:
-        from mobile.network import NetworkType
+        from murnet.mobile.network import NetworkType
         mock.return_value = NetworkType.WIFI
         yield mock
 
