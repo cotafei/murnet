@@ -1,0 +1,15 @@
+[Unit]
+Description=MurNet Official Website (FastAPI on 127.0.0.1:8383)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/murnet-website
+ExecStart=/usr/bin/python3 -u /root/murnet-website/app.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/murnet-website.log
+StandardError=append:/var/log/murnet-website.log
+
+[Install]
+WantedBy=multi-user.target

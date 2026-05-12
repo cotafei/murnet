@@ -1,0 +1,40 @@
+2026-05-11 22:50:06,391  INFO  ==================================================
+2026-05-11 22:50:06,394  INFO   MurNet Home Middle Relay
+2026-05-11 22:50:06,395  INFO  ==================================================
+2026-05-11 22:50:06,396  INFO   Advertised:  80.93.52.15:9292
+2026-05-11 22:50:06,397  INFO   Listening:   0.0.0.0:9292
+2026-05-11 22:50:06,398  INFO   Name:        user-3776
+2026-05-11 22:50:06,399  INFO   Bootstrap:   80.93.52.15:9211 (Guard), 80.93.52.15:9213 (HS)
+2026-05-11 22:50:06,400  INFO  ==================================================
+2026-05-11 22:50:06,403  INFO  [80.93.52.15:9292] listening on 0.0.0.0:9292
+2026-05-11 22:50:06,404  INFO  \u2713 Middle relay started. Gossip-announcing every 30s.
+2026-05-11 22:50:06,405  INFO    Чтобы тест прошёл — порт 9292 должен быть проброшен на роутере.
+2026-05-11 22:50:06,406  INFO    Ctrl+C для остановки.
+2026-05-11 22:51:06,412  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 22:52:06,437  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 22:53:06,452  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 22:54:06,479  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 22:55:06,485  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 22:56:06,513  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 22:57:06,543  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 22:58:06,548  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 22:59:06,571  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:00:06,581  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:01:06,601  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:02:06,612  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:03:06,619  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:04:06,649  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:05:06,683  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:06:06,709  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:07:06,720  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:08:06,730  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:09:06,775  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:10:06,780  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:11:06,788  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:12:06,823  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-11 23:13:06,828  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-12 18:31:52,909  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-12 18:32:52,917  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-12 18:33:52,991  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-12 18:34:53,061  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0
+2026-05-12 18:35:53,074  INFO  [stats] probes_rejected=0  rate_limited=0  replays_rejected=0  active_streams=0  banned_ips=0

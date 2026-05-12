@@ -20,11 +20,12 @@ import os
 import sys
 import threading
 
-# ── Chromium proxy — set via env var BEFORE any Qt import ──────────────────
+# ── VDS endpoints (real production) ───────────────────────────────────────
 _PROXY_PORT  = 18888
 _VDS_IP      = "80.93.52.15"
 _VDS_GUARD   = 9211
-_VDS_MIDDLE  = 9213
+_VDS_MIDDLE  = 9212
+_VDS_HS      = 9213
 _CLIENT_PORT = 18204
 
 # QTWEBENGINE_CHROMIUM_FLAGS is the correct way to pass Chromium flags
@@ -302,7 +303,8 @@ async def _start_nodes(signals: _Signals) -> None:
         import time as _time
         vds_hs_addr = "fgseSxh6fbMktJ1oD9mcU9ycYo4ZUzWNxf.murnet"
         vds_hs_pub  = "eba400645db5ad46fb7081b3c785e9cf2b7d7c3ccae839c8533e99d31d3293d8"
-        vds_hs_relay = f"{_VDS_IP}:{_VDS_MIDDLE}"
+        # HS relay указывает на настоящий HS-порт VDS (9213)
+        vds_hs_relay = f"{_VDS_IP}:{_VDS_HS}"
         
         directory._entries[vds_hs_addr.lower()] = {
             "pubkey":    vds_hs_pub,

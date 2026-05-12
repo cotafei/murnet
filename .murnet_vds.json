@@ -1,0 +1,9 @@
+{
+  "services": {
+    "fgsesxh6fbmktj1od9mcu9ycyo4zuzwnxf.murnet": {
+      "pubkey": "eba400645db5ad46fb7081b3c785e9cf2b7d7c3ccae839c8533e99d31d3293d8",
+      "relay": "80.93.52.15:9213",
+      "timestamp": 1778066518.2541244
+    }
+  }
+}

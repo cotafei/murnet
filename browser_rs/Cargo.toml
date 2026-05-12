@@ -1,0 +1,20 @@
+[package]
+name = "murnet_browser"
+version = "0.1.0"
+edition = "2021"
+description = "MurNet Browser — Rust UI поверх системного WebView (wry + tao)"
+
+[[bin]]
+name = "murnet_browser"
+path = "src/main.rs"
+
+[dependencies]
+wry = "0.45"
+tao = "0.30"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

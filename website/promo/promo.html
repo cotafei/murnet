@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>MurNet</title>
+<style>
+  /* ────────────────────────────────────────────────────────────────────
+     MurNet promo · 48s · 1920x1080 · cinematic
+     8 сцен, mesh-визуализация, use cases
+     ──────────────────────────────────────────────────────────────────── */
+  :root{
+    --bg:#000; --ink:#fafafa; --dim:#5e6371; --line:#1a1d24;
+    --c1:#5b8def; --c2:#5fbf86; --c3:#a78bfa;
+    --ease: cubic-bezier(.16, 1, .3, 1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  html,body{
+    background:var(--bg);color:var(--ink);width:1920px;height:1080px;overflow:hidden;
+    font-family:'Inter',-apple-system,'SF Pro Display','Segoe UI',system-ui,sans-serif;
+    font-weight:200;
+  }
+
+  /* ────── star field bg ────── */
+  .stars{position:fixed;inset:-10%;z-index:0;opacity:.5;
+    background-image:
+      radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.55), transparent 50%),
+      radial-gradient(1px 1px at 27% 73%, rgba(255,255,255,.4),  transparent 50%),
+      radial-gradient(1px 1px at 41% 35%, rgba(255,255,255,.7),  transparent 50%),
+      radial-gradient(1px 1px at 58% 58%, rgba(255,255,255,.3),  transparent 50%),
+      radial-gradient(1px 1px at 73% 22%, rgba(255,255,255,.55), transparent 50%),
+      radial-gradient(1.5px 1.5px at 86% 67%, rgba(255,255,255,.4),transparent 50%),
+      radial-gradient(1px 1px at 14% 84%, rgba(255,255,255,.5),  transparent 50%),
+      radial-gradient(1px 1px at 94% 31%, rgba(255,255,255,.45), transparent 50%);
+    animation: drift 90s linear infinite}
+  @keyframes drift{0%{transform:translateY(0)}100%{transform:translateY(-2%)}}
+
+  .vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(0,0,0,.9) 92%)}
+
+  .scene{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;opacity:0;z-index:2;will-change:opacity,transform,filter}
+
+  /* ═══════════ S1 (0–4s) — luminous mark ═══════════ */
+  #s1{animation: s1-in 4s 0s var(--ease) forwards}
+  @keyframes s1-in{
+    0%{opacity:0; filter:blur(20px); transform:scale(.92)}
+    25%{opacity:1; filter:blur(0); transform:scale(1)}
+    75%{opacity:1; filter:blur(0); transform:scale(1)}
+    100%{opacity:0; filter:blur(8px); transform:scale(1.04)}
+  }
+  .s1-orbit{position:absolute;width:560px;height:560px;border-radius:50%;
+    background:radial-gradient(circle, rgba(91,141,239,.18) 0%, transparent 55%);
+    animation: orbit 5s ease-in-out infinite}
+  @keyframes orbit{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.15);opacity:.25}}
+  .s1-rim{position:absolute;width:380px;height:380px;border-radius:50%;border:1px solid rgba(255,255,255,.06)}
+  .s1-mark{width:220px;height:220px;z-index:2;
+    filter:drop-shadow(0 0 60px rgba(91,141,239,.45)) drop-shadow(0 0 20px rgba(167,139,250,.3))}
+
+  /* ═══════════ S2 (3.5–8s) — wordmark ═══════════ */
+  #s2{animation: s2-in 4.5s 3.5s var(--ease) forwards}
+  @keyframes s2-in{
+    0%{opacity:0; transform:translateY(40px); filter:blur(12px)}
+    18%{opacity:1; transform:none; filter:blur(0)}
+    82%{opacity:1; transform:none; filter:blur(0)}
+    100%{opacity:0; transform:translateY(-20px); filter:blur(6px)}
+  }
+  .s2-mark{width:80px;height:80px;margin-bottom:32px;opacity:.85;
+    filter:drop-shadow(0 0 20px rgba(91,141,239,.3))}
+  .s2-h{font-size:200px;font-weight:200;letter-spacing:-10px;line-height:1;text-align:center}
+  .s2-h .dot{color:var(--c1)}
+  .s2-tag{margin-top:24px;font-size:18px;letter-spacing:8px;color:var(--dim);
+    font-family:'JetBrains Mono','SF Mono',Consolas,monospace;text-transform:uppercase}
+
+  /* ═══════════ S3 (7.5–18s) — MESH NETWORK ═══════════ */
+  #s3{animation: s3-in 10.5s 7.5s var(--ease) forwards}
+  @keyframes s3-in{
+    0%{opacity:0; filter:blur(12px); transform:scale(1.1)}
+    10%{opacity:1; filter:blur(0); transform:scale(1)}
+    88%{opacity:1; filter:blur(0); transform:scale(1)}
+    100%{opacity:0; filter:blur(8px); transform:scale(.95)}
+  }
+  .s3-caption{position:absolute;top:90px;left:50%;transform:translateX(-50%);
+    font-size:18px;color:var(--dim);letter-spacing:8px;text-transform:uppercase;
+    font-family:'JetBrains Mono','SF Mono',Consolas,monospace;opacity:0;
+    animation: caption-in 1s 8s var(--ease) forwards}
+  @keyframes caption-in{to{opacity:1}}
+
+  .s3-mesh{width:1700px;height:780px;position:relative;animation: mesh-rotate 40s linear infinite}
+  @keyframes mesh-rotate{from{transform:rotate(0)}to{transform:rotate(2deg)}}
+
+  .s3-mesh svg{width:100%;height:100%;overflow:visible}
+
+  .mn{r:5; fill:#0e1118; stroke:#fafafa; stroke-width:1.2;
+    opacity:0; animation: node-in 0.8s var(--ease) forwards}
+  .mn.accent.c1{stroke:var(--c1);  filter:drop-shadow(0 0 12px rgba(91,141,239,.6))}
+  .mn.accent.c2{stroke:var(--c2);  filter:drop-shadow(0 0 12px rgba(95,191,134,.6))}
+  .mn.accent.c3{stroke:var(--c3);  filter:drop-shadow(0 0 12px rgba(167,139,250,.6))}
+  .mn.accent{r:8; stroke-width:1.8}
+  @keyframes node-in{from{opacity:0; transform-origin:center; r:0}to{opacity:.7}}
+  .mn.accent{animation-name: node-in-accent}
+  @keyframes node-in-accent{from{opacity:0}to{opacity:1}}
+
+  .ml{stroke:#fafafa; stroke-width:.8; opacity:0;
+    stroke-dasharray:300; stroke-dashoffset:300;
+    animation: line-draw 1.5s var(--ease) forwards}
+  @keyframes line-draw{to{opacity:.18; stroke-dashoffset:0}}
+
+  /* pulse traveling along the strong path */
+  .mp{r:4; fill:#fafafa;
+      filter:drop-shadow(0 0 12px var(--ink)) drop-shadow(0 0 24px var(--ink));
+      offset-path: path('M 250 400 L 600 250 L 900 500 L 1200 280 L 1450 400');
+      offset-distance: 0%; opacity:0;
+      animation: pulse-travel 5s 11s ease-in-out infinite}
+  @keyframes pulse-travel{
+    0%{offset-distance: 0%; opacity:0}
+    8%{opacity:1}
+    92%{opacity:1}
+    100%{offset-distance: 100%; opacity:0}
+  }
+
+  .s3-cap-bottom{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);
+    font-size:48px;font-weight:200;letter-spacing:-1.5px;opacity:0;text-align:center;
+    animation: cap-bottom-in 1.5s 14.5s var(--ease) forwards}
+  @keyframes cap-bottom-in{from{opacity:0;transform:translate(-50%,20px);filter:blur(8px)}
+                           to  {opacity:1;transform:translate(-50%,0);filter:blur(0)}}
+  .s3-cap-bottom em{font-style:normal;
+    background:linear-gradient(135deg,var(--c1) 0%,var(--c2) 50%,var(--c3) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* ═══════════ S4 (17.5–28s) — USE CASES ═══════════ */
+  #s4{animation: s4-in 10.5s 17.5s var(--ease) forwards}
+  @keyframes s4-in{0%{opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{opacity:0}}
+
+  .s4-head{position:absolute;top:140px;left:50%;transform:translateX(-50%);
+    font-size:18px;color:var(--dim);letter-spacing:8px;text-transform:uppercase;
+    font-family:'JetBrains Mono','SF Mono',Consolas,monospace;opacity:0;
+    animation: caption-in 1s 18s var(--ease) forwards}
+
+  .s4-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:80px 120px;
+    width:1300px}
+  .s4-item{display:flex;flex-direction:column;align-items:center;gap:24px;
+    opacity:0;transform:translateY(40px);filter:blur(8px)}
+  .s4-item:nth-child(1){animation: item-in 1.2s 18.5s var(--ease) forwards}
+  .s4-item:nth-child(2){animation: item-in 1.2s 19.5s var(--ease) forwards}
+  .s4-item:nth-child(3){animation: item-in 1.2s 20.5s var(--ease) forwards}
+  .s4-item:nth-child(4){animation: item-in 1.2s 21.5s var(--ease) forwards}
+  @keyframes item-in{to{opacity:1;transform:none;filter:blur(0)}}
+
+  .s4-icon{width:140px;height:140px;border-radius:32px;
+    background:#0a0c12;border:1px solid #20232c;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 60px rgba(255,255,255,.03), inset 0 1px 0 rgba(255,255,255,.06)}
+  .s4-icon svg{width:64px;height:64px;stroke:#fafafa;stroke-width:1.5;fill:none;
+    stroke-linecap:round;stroke-linejoin:round}
+  .s4-icon.c1{box-shadow:0 0 60px rgba(91,141,239,.2)}
+  .s4-icon.c1 svg{stroke:var(--c1)}
+  .s4-icon.c2{box-shadow:0 0 60px rgba(95,191,134,.2)}
+  .s4-icon.c2 svg{stroke:var(--c2)}
+  .s4-icon.c3{box-shadow:0 0 60px rgba(167,139,250,.2)}
+  .s4-icon.c3 svg{stroke:var(--c3)}
+
+  .s4-title{font-size:42px;font-weight:300;letter-spacing:-1px;line-height:1.1;text-align:center}
+  .s4-sub{font-size:18px;color:var(--dim);text-align:center;max-width:380px;line-height:1.5}
+
+  /* ═══════════ S5 (27.5–34s) — PROTOCOL STACK ═══════════ */
+  #s5{animation: s5-in 6.5s 27.5s var(--ease) forwards}
+  @keyframes s5-in{0%{opacity:0;filter:blur(10px)} 14%{opacity:1;filter:blur(0)} 86%{opacity:1;filter:blur(0)} 100%{opacity:0;filter:blur(6px)}}
+
+  .s5-h{font-size:80px;font-weight:200;letter-spacing:-2.5px;margin-bottom:60px;text-align:center}
+  .s5-stack{display:flex;flex-direction:column;gap:10px;width:780px}
+  .s5-layer{display:flex;justify-content:space-between;align-items:center;
+    background:#0a0c12;border:1px solid #20232c;border-radius:14px;
+    padding:24px 32px;font-family:'JetBrains Mono','SF Mono',Consolas,monospace;
+    opacity:0;transform:translateX(-30px)}
+  .s5-layer .name{font-size:14px;letter-spacing:3px;text-transform:uppercase;color:var(--dim)}
+  .s5-layer .v{font-size:22px;font-weight:500}
+  .s5-layer.l1{animation: layer-in 0.7s 28.3s var(--ease) forwards}
+  .s5-layer.l2{animation: layer-in 0.7s 28.7s var(--ease) forwards}
+  .s5-layer.l3{animation: layer-in 0.7s 29.1s var(--ease) forwards}
+  .s5-layer.l4{animation: layer-in 0.7s 29.5s var(--ease) forwards}
+  .s5-layer.l1 .v{color:var(--c1)}
+  .s5-layer.l2 .v{color:var(--c2)}
+  .s5-layer.l3 .v{color:var(--c3)}
+  .s5-layer.l4 .v{color:var(--ink)}
+  @keyframes layer-in{to{opacity:1;transform:none}}
+
+  /* ═══════════ S6 (33.5–39s) — values ladder ═══════════ */
+  #s6{animation: s6-in 5.5s 33.5s var(--ease) forwards}
+  @keyframes s6-in{0%{opacity:0} 14%{opacity:1} 86%{opacity:1} 100%{opacity:0}}
+
+  .s6-list{display:flex;flex-direction:column;align-items:center;gap:18px}
+  .s6-line{font-size:74px;font-weight:200;letter-spacing:-2.5px;opacity:0;transform:translateY(28px);filter:blur(8px)}
+  .s6-line:nth-child(1){animation: line-in 1s 34s var(--ease) forwards}
+  .s6-line:nth-child(2){animation: line-in 1s 34.7s var(--ease) forwards}
+  .s6-line:nth-child(3){animation: line-in 1s 35.4s var(--ease) forwards}
+  .s6-line:nth-child(4){animation: line-in 1s 36.1s var(--ease) forwards}
+  @keyframes line-in{to{opacity:.92;transform:none;filter:blur(0)}}
+  .s6-line span.muted{color:var(--dim)}
+
+  /* ═══════════ S7 (38.5–44s) — CTA ═══════════ */
+  #s7{animation: s7-in 5.5s 38.5s var(--ease) forwards}
+  @keyframes s7-in{0%{opacity:0;filter:blur(10px)} 14%{opacity:1;filter:blur(0)} 86%{opacity:1;filter:blur(0)} 100%{opacity:0;filter:blur(6px)}}
+
+  .s7-h{font-size:120px;font-weight:200;letter-spacing:-4px;line-height:1;margin-bottom:48px;text-align:center}
+  .s7-chip{display:inline-flex;align-items:center;gap:18px;
+    background:#0a0c12;border:1px solid #20232c;border-radius:999px;
+    padding:18px 32px 18px 26px;
+    box-shadow:0 0 80px rgba(95,191,134,.18), inset 0 0 0 1px rgba(95,191,134,.1);
+    animation: chip-glow 3s ease-in-out infinite}
+  @keyframes chip-glow{0%,100%{box-shadow:0 0 80px rgba(95,191,134,.15)}
+                       50% {box-shadow:0 0 120px rgba(95,191,134,.4)}}
+  .s7-chip .glow{width:10px;height:10px;border-radius:50%;background:var(--c2);
+    box-shadow:0 0 14px var(--c2);animation: blink 1.5s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .s7-chip .addr{font-family:'JetBrains Mono','SF Mono',Consolas,monospace;
+    font-size:28px;letter-spacing:.5px;color:var(--ink);font-weight:400}
+
+  /* ═══════════ S8 (43.5–48s) — outro ═══════════ */
+  #s8{animation: s8-in 4.5s 43.5s var(--ease) forwards}
+  @keyframes s8-in{
+    0%{opacity:0; transform:scale(.96); filter:blur(8px)}
+    20%{opacity:1; transform:scale(1); filter:blur(0)}
+    100%{opacity:1; transform:scale(1); filter:blur(0)}
+  }
+  .s8-mark{width:120px;height:120px;margin-bottom:36px;
+    filter:drop-shadow(0 0 40px rgba(91,141,239,.4))}
+  .s8-word{font-size:140px;font-weight:200;letter-spacing:-5px;line-height:1}
+  .s8-tag{margin-top:24px;font-family:'JetBrains Mono','SF Mono',Consolas,monospace;
+    font-size:14px;letter-spacing:10px;color:var(--dim);text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<div class="stars"></div>
+<div class="vignette"></div>
+
+<!-- ═══ S1 ═══ -->
+<div id="s1" class="scene">
+  <div class="s1-orbit"></div>
+  <div class="s1-rim"></div>
+  <svg class="s1-mark" viewBox="0 0 256 256">
+    <circle cx="128" cy="128" r="124" fill="#0a0c12"/>
+    <path d="M 56 96 L 80 36 L 108 86 L 148 86 L 176 36 L 200 96 C 200 168, 168 208, 128 208 C 88 208, 56 168, 56 96 Z" fill="#fafafa"/>
+    <circle cx="128" cy="148" r="4" fill="#0a0c12"/>
+  </svg>
+</div>
+
+<!-- ═══ S2 ═══ -->
+<div id="s2" class="scene">
+  <svg class="s2-mark" viewBox="0 0 256 256">
+    <circle cx="128" cy="128" r="124" fill="#0a0c12"/>
+    <path d="M 56 96 L 80 36 L 108 86 L 148 86 L 176 36 L 200 96 C 200 168, 168 208, 128 208 C 88 208, 56 168, 56 96 Z" fill="#fafafa"/>
+    <circle cx="128" cy="148" r="4" fill="#0a0c12"/>
+  </svg>
+  <h1 class="s2-h">murnet<span class="dot">.</span></h1>
+  <div class="s2-tag">кошачий интернет</div>
+</div>
+
+<!-- ═══ S3 — MESH ═══ -->
+<div id="s3" class="scene">
+  <div class="s3-caption">сеть, которую создают пользователи</div>
+  <div class="s3-mesh">
+    <svg viewBox="0 0 1700 780">
+      <!-- LINES (drawn before nodes; animation-delay staggered) -->
+      <line class="ml" style="animation-delay:8.5s"  x1="250" y1="400" x2="450" y2="180"/>
+      <line class="ml" style="animation-delay:8.7s"  x1="250" y1="400" x2="400" y2="600"/>
+      <line class="ml" style="animation-delay:8.9s"  x1="450" y1="180" x2="600" y2="250"/>
+      <line class="ml" style="animation-delay:9.1s"  x1="450" y1="180" x2="700" y2="100"/>
+      <line class="ml" style="animation-delay:9.3s"  x1="400" y1="600" x2="600" y2="500"/>
+      <line class="ml" style="animation-delay:9.5s"  x1="400" y1="600" x2="550" y2="700"/>
+      <line class="ml" style="animation-delay:9.7s"  x1="600" y1="250" x2="900" y2="500"/>
+      <line class="ml" style="animation-delay:9.7s"  x1="600" y1="250" x2="850" y2="180"/>
+      <line class="ml" style="animation-delay:9.9s"  x1="700" y1="100" x2="900" y2="180"/>
+      <line class="ml" style="animation-delay:10.0s" x1="600" y1="500" x2="800" y2="600"/>
+      <line class="ml" style="animation-delay:10.1s" x1="550" y1="700" x2="800" y2="650"/>
+      <line class="ml" style="animation-delay:10.2s" x1="900" y1="500" x2="1200" y2="280"/>
+      <line class="ml" style="animation-delay:10.3s" x1="900" y1="500" x2="1100" y2="630"/>
+      <line class="ml" style="animation-delay:10.4s" x1="850" y1="180" x2="1100" y2="240"/>
+      <line class="ml" style="animation-delay:10.5s" x1="800" y1="600" x2="1100" y2="630"/>
+      <line class="ml" style="animation-delay:10.6s" x1="800" y1="650" x2="1050" y2="700"/>
+      <line class="ml" style="animation-delay:10.7s" x1="1200" y1="280" x2="1450" y2="400"/>
+      <line class="ml" style="animation-delay:10.8s" x1="1200" y1="280" x2="1380" y2="180"/>
+      <line class="ml" style="animation-delay:10.9s" x1="1100" y1="240" x2="1380" y2="180"/>
+      <line class="ml" style="animation-delay:11.0s" x1="1100" y1="630" x2="1380" y2="600"/>
+      <line class="ml" style="animation-delay:11.1s" x1="1050" y1="700" x2="1300" y2="710"/>
+      <line class="ml" style="animation-delay:11.2s" x1="1450" y1="400" x2="1380" y2="180"/>
+      <line class="ml" style="animation-delay:11.3s" x1="1450" y1="400" x2="1380" y2="600"/>
+      <line class="ml" style="animation-delay:11.4s" x1="1380" y1="600" x2="1300" y2="710"/>
+      <line class="ml" style="animation-delay:11.5s" x1="900" y1="180" x2="1100" y2="240"/>
+      <line class="ml" style="animation-delay:11.6s" x1="900" y1="180" x2="850" y2="180"/>
+
+      <!-- NODES — ordinary -->
+      <circle class="mn" style="animation-delay:8.5s"  cx="450" cy="180"/>
+      <circle class="mn" style="animation-delay:8.7s"  cx="400" cy="600"/>
+      <circle class="mn" style="animation-delay:8.9s"  cx="700" cy="100"/>
+      <circle class="mn" style="animation-delay:9.1s"  cx="550" cy="700"/>
+      <circle class="mn" style="animation-delay:9.3s"  cx="850" cy="180"/>
+      <circle class="mn" style="animation-delay:9.5s"  cx="900" cy="180"/>
+      <circle class="mn" style="animation-delay:9.7s"  cx="800" cy="600"/>
+      <circle class="mn" style="animation-delay:9.9s"  cx="800" cy="650"/>
+      <circle class="mn" style="animation-delay:10.1s" cx="1100" cy="240"/>
+      <circle class="mn" style="animation-delay:10.3s" cx="1100" cy="630"/>
+      <circle class="mn" style="animation-delay:10.5s" cx="1050" cy="700"/>
+      <circle class="mn" style="animation-delay:10.7s" cx="1380" cy="180"/>
+      <circle class="mn" style="animation-delay:10.9s" cx="1380" cy="600"/>
+      <circle class="mn" style="animation-delay:11.1s" cx="1300" cy="710"/>
+
+      <!-- ACCENT NODES — Guard, Middle, HS metaphor -->
+      <circle class="mn accent c1" style="animation-delay:9s"  cx="250" cy="400"/>
+      <circle class="mn accent c2" style="animation-delay:9.5s" cx="600" cy="250"/>
+      <circle class="mn accent c2" style="animation-delay:9.7s" cx="600" cy="500"/>
+      <circle class="mn accent c3" style="animation-delay:10s" cx="900" cy="500"/>
+      <circle class="mn accent c1" style="animation-delay:10.5s" cx="1200" cy="280"/>
+      <circle class="mn accent c3" style="animation-delay:11s" cx="1450" cy="400"/>
+
+      <!-- TRAVELING PULSE -->
+      <circle class="mp" cx="0" cy="0"/>
+    </svg>
+  </div>
+  <div class="s3-cap-bottom">десятки узлов. одно <em>невидимое</em> соединение.</div>
+</div>
+
+<!-- ═══ S4 — USE CASES ═══ -->
+<div id="s4" class="scene">
+  <div class="s4-head">для чего</div>
+  <div class="s4-grid">
+    <div class="s4-item">
+      <div class="s4-icon c1">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
+      </div>
+      <div class="s4-title">скрытые сайты</div>
+      <div class="s4-sub">.murnet адреса вместо .onion. свой каталог, открытый формат</div>
+    </div>
+    <div class="s4-item">
+      <div class="s4-icon c2">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      </div>
+      <div class="s4-title">приватные чаты</div>
+      <div class="s4-sub">мессенджеры без телефона, без аккаунта, без логов на сервере</div>
+    </div>
+    <div class="s4-item">
+      <div class="s4-icon c3">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      </div>
+      <div class="s4-title">файлы без следа</div>
+      <div class="s4-sub">обмен файлами p2p внутри сети. ни облака, ни истории</div>
+    </div>
+    <div class="s4-item">
+      <div class="s4-icon c1">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      </div>
+      <div class="s4-title">обход блокировок</div>
+      <div class="s4-sub">провайдер видит шум. куда вы ходите — узнать невозможно</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ S5 — PROTOCOL STACK ═══ -->
+<div id="s5" class="scene">
+  <h2 class="s5-h">внутри</h2>
+  <div class="s5-stack">
+    <div class="s5-layer l1"><span class="name">handshake</span><span class="v">X25519 + HMAC-PSK</span></div>
+    <div class="s5-layer l2"><span class="name">шифр</span><span class="v">ChaCha20-Poly1305</span></div>
+    <div class="s5-layer l3"><span class="name">адреса</span><span class="v">Ed25519 + Blake2b</span></div>
+    <div class="s5-layer l4"><span class="name">replay</span><span class="v">защита v2</span></div>
+  </div>
+</div>
+
+<!-- ═══ S6 — VALUES ═══ -->
+<div id="s6" class="scene">
+  <div class="s6-list">
+    <div class="s6-line"><span class="muted">никаких</span> логов</div>
+    <div class="s6-line"><span class="muted">никакой</span> регистрации</div>
+    <div class="s6-line"><span class="muted">никаких</span> аккаунтов</div>
+    <div class="s6-line"><span class="muted">никаких</span> следов</div>
+  </div>
+</div>
+
+<!-- ═══ S7 — CTA ═══ -->
+<div id="s7" class="scene">
+  <h2 class="s7-h">просто откройте</h2>
+  <div class="s7-chip">
+    <span class="glow"></span>
+    <span class="addr">●●●●●●●●●●●●●●●●●●●●.murnet</span>
+  </div>
+</div>
+
+<!-- ═══ S8 — OUTRO ═══ -->
+<div id="s8" class="scene">
+  <svg class="s8-mark" viewBox="0 0 256 256">
+    <circle cx="128" cy="128" r="124" fill="#0a0c12"/>
+    <path d="M 56 96 L 80 36 L 108 86 L 148 86 L 176 36 L 200 96 C 200 168, 168 208, 128 208 C 88 208, 56 168, 56 96 Z" fill="#fafafa"/>
+    <circle cx="128" cy="148" r="4" fill="#0a0c12"/>
+  </svg>
+  <div class="s8-word">murnet</div>
+  <div class="s8-tag">сеть без следа</div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MurNet — кошачий интернет</title>
+<meta name="description" content="MurNet — собственная onion-сеть. Не Tor, не VPN. Свой стек, X25519, ChaCha20.">
+<link rel="icon" type="image/svg+xml" href="/static/assets/logo-mark.svg">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  :root{
+    --bg:#0a0c10; --bg2:#11151c; --bg3:#161b22; --bg4:#1c2230;
+    --line:#1f2530; --line2:#2a313e;
+    --txt:#e6edf3; --dim:#7d8590; --dimmer:#3a4458;
+    --c1:#5b8def; --c2:#5fbf86; --c3:#a78bfa; --err:#f85149;
+  }
+  html{scroll-behavior:smooth}
+  html,body{background:var(--bg);color:var(--txt);
+    font-family:'Inter',-apple-system,'Segoe UI',system-ui,sans-serif;line-height:1.55;overflow-x:hidden}
+
+  body::before{content:'';position:fixed;inset:0;z-index:0;opacity:.4;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px);
+    background-size:40px 40px;
+    mask-image:radial-gradient(ellipse at 50% 20%, black 0%, transparent 70%)}
+
+  /* nav */
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;
+    backdrop-filter:blur(16px);background:rgba(10,12,16,.7);
+    border-bottom:1px solid var(--line)}
+  .nav-inner{max-width:1200px;margin:0 auto;padding:14px 32px;
+    display:flex;justify-content:space-between;align-items:center;gap:24px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;letter-spacing:-.3px;text-decoration:none;color:var(--txt)}
+  .brand svg{width:26px;height:26px}
+  .nav-links{display:flex;gap:28px;font-family:'JetBrains Mono',Consolas,monospace;font-size:12px}
+  .nav-links a{color:var(--dim);text-decoration:none;transition:.15s}
+  .nav-links a:hover{color:var(--txt)}
+  .nav-status{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;color:var(--c2)}
+  .nav-status .dot{width:6px;height:6px;border-radius:50%;background:var(--c2);box-shadow:0 0 6px var(--c2);animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  section{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:120px 32px}
+  section:not(:first-of-type){padding-top:80px}
+
+  /* HERO */
+  .hero{text-align:center;padding-top:160px;min-height:90vh;display:flex;flex-direction:column;justify-content:center}
+  .badge{display:inline-flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;color:var(--dim);letter-spacing:1.5px;margin:0 auto 28px}
+  .badge .new{background:var(--c1);color:var(--bg);padding:2px 8px;border-radius:999px;font-weight:600;font-size:9px;letter-spacing:1px}
+  h1{font-size:clamp(40px, 7vw, 84px);font-weight:600;letter-spacing:-3px;line-height:1.02;margin-bottom:20px}
+  h1 .accent{background:linear-gradient(135deg,var(--c1) 0%,var(--c2) 50%,var(--c3) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.sub{font-size:clamp(15px,1.5vw,19px);color:var(--dim);max-width:580px;margin:0 auto 40px;line-height:1.55}
+  .cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{padding:14px 26px;border-radius:10px;font-size:14px;font-weight:500;text-decoration:none;transition:.15s;display:inline-flex;align-items:center;gap:8px;border:1px solid transparent;cursor:pointer;font-family:inherit}
+  .btn-primary{background:var(--txt);color:var(--bg);border-color:var(--txt)}
+  .btn-primary:hover{background:#fff;transform:translateY(-1px);box-shadow:0 8px 24px rgba(91,141,239,.15)}
+  .btn-ghost{background:transparent;border-color:var(--line2);color:var(--txt)}
+  .btn-ghost:hover{border-color:var(--dim);background:var(--bg2)}
+  .btn .k{font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;opacity:.6}
+
+  /* live status */
+  .live-stats{display:flex;justify-content:center;gap:24px;margin-top:48px;flex-wrap:wrap}
+  .stat{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px 24px;text-align:left;min-width:140px}
+  .stat .v{font-family:'JetBrains Mono',Consolas,monospace;font-size:20px;font-weight:600;letter-spacing:-.5px}
+  .stat .v.ok{color:var(--c2)}
+  .stat .l{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-top:2px}
+
+  /* FEATURES */
+  .section-head{text-align:center;margin-bottom:48px}
+  .section-head h2{font-size:clamp(28px,4vw,42px);font-weight:600;letter-spacing:-1.5px;margin-bottom:12px}
+  .section-head p{color:var(--dim);font-size:15px;max-width:560px;margin:0 auto}
+
+  .feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+  .feature{background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:32px 28px;transition:.15s;position:relative;overflow:hidden}
+  .feature:hover{border-color:var(--line2);background:var(--bg3);transform:translateY(-2px)}
+  .feature .num{position:absolute;top:24px;right:28px;font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;color:var(--dim);letter-spacing:1px}
+  .feature .ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:18px;font-weight:700;font-family:'JetBrains Mono',Consolas,monospace}
+  .feature.f1 .ico{background:rgba(91,141,239,.12);color:var(--c1)}
+  .feature.f2 .ico{background:rgba(95,191,134,.12);color:var(--c2)}
+  .feature.f3 .ico{background:rgba(167,139,250,.12);color:var(--c3)}
+  .feature h3{font-size:18px;font-weight:600;letter-spacing:-.3px;margin-bottom:10px}
+  .feature p{font-size:13.5px;color:var(--dim);line-height:1.6}
+
+  /* CIRCUIT visualization */
+  .circuit-wrap{background:var(--bg2);border:1px solid var(--line);border-radius:24px;padding:48px;margin-top:40px}
+  .circuit-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:40px;flex-wrap:wrap;gap:12px}
+  .circuit-head .t{font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--dim)}
+  .circuit-head .live{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;color:var(--c2);padding:6px 14px;background:rgba(95,191,134,.08);border:1px solid rgba(95,191,134,.25);border-radius:999px}
+  .circuit-head .live .dot{width:6px;height:6px;border-radius:50%;background:var(--c2);box-shadow:0 0 6px var(--c2);animation:pulse 2s ease-in-out infinite}
+
+  .chain{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:8px}
+  .node{flex:1;min-width:140px;background:var(--bg3);border:1.5px solid var(--line);border-radius:14px;padding:20px;font-family:'JetBrains Mono',Consolas,monospace;text-align:center;transition:.2s}
+  .node .label{font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;font-weight:600}
+  .node .ip{font-size:13px;color:var(--txt);font-weight:500;word-break:break-all}
+  .node .port{font-size:11px;color:var(--dim);margin-top:4px}
+  .node .knows{font-size:10px;color:var(--dimmer);margin-top:14px;line-height:1.5}
+  .node.n1{border-color:rgba(91,141,239,.35)}
+  .node.n1 .label{color:var(--c1)}
+  .node.n2{border-color:rgba(95,191,134,.35)}
+  .node.n2 .label{color:var(--c2)}
+  .node.n3{border-color:rgba(167,139,250,.35)}
+  .node.n3 .label{color:var(--c3)}
+  .arr{display:flex;align-items:center;justify-content:center;padding:0 8px;color:var(--line2);font-size:18px;font-family:'JetBrains Mono',monospace}
+
+  /* HOW IT WORKS — comparison */
+  .compare{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:32px}
+  .comp{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:24px}
+  .comp .h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+  .comp .h h4{font-size:16px;font-weight:600}
+  .comp .h .tag{font-family:'JetBrains Mono',Consolas,monospace;font-size:10px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase}
+  .comp .row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;color:var(--dim)}
+  .comp .row .y{color:var(--c2)}
+  .comp .row .n{color:var(--err)}
+  .comp .row .x{width:16px;text-align:center;flex-shrink:0;font-family:'JetBrains Mono',monospace}
+  .comp.us{border-color:rgba(91,141,239,.3);background:linear-gradient(180deg,rgba(91,141,239,.04),var(--bg2))}
+
+  /* FAQ */
+  .faq{max-width:760px;margin:0 auto}
+  .qa{background:var(--bg2);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden;transition:.15s}
+  .qa:hover{border-color:var(--line2)}
+  .qa summary{cursor:pointer;padding:20px 24px;font-weight:500;font-size:15px;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:14px}
+  .qa summary::-webkit-details-marker{display:none}
+  .qa summary::after{content:'+';font-family:'JetBrains Mono',monospace;color:var(--dim);font-size:18px;transition:.2s}
+  .qa[open] summary::after{transform:rotate(45deg);color:var(--c1)}
+  .qa .a{padding:0 24px 22px;color:var(--dim);font-size:14px;line-height:1.65}
+  .qa .a code{background:var(--bg);padding:1px 6px;border-radius:3px;font-family:'JetBrains Mono',Consolas,monospace;color:var(--c1);border:1px solid var(--line);font-size:12px}
+
+  /* DOWNLOAD card */
+  .dl{background:linear-gradient(135deg,rgba(91,141,239,.06),rgba(167,139,250,.06));border:1px solid var(--line2);border-radius:24px;padding:60px 48px;text-align:center;margin-top:40px}
+  .dl h3{font-size:32px;font-weight:600;letter-spacing:-1px;margin-bottom:12px}
+  .dl p{color:var(--dim);font-size:15px;max-width:480px;margin:0 auto 28px}
+  .dl-platforms{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:24px}
+  .dl-plat{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:14px 22px;color:var(--txt);text-decoration:none;font-family:'JetBrains Mono',Consolas,monospace;font-size:12px;display:inline-flex;align-items:center;gap:10px;transition:.15s}
+  .dl-plat:hover{border-color:var(--c1);transform:translateY(-1px)}
+  .dl-plat .sz{color:var(--dim);font-size:10px}
+
+  /* FOOTER */
+  footer{position:relative;z-index:1;border-top:1px solid var(--line);padding:48px 32px 32px;background:var(--bg2);margin-top:80px}
+  .f-inner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
+  .f-brand p{color:var(--dim);font-size:13px;margin-top:14px;max-width:280px;line-height:1.6}
+  .f-col h5{font-family:'JetBrains Mono',Consolas,monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:14px}
+  .f-col a{display:block;color:var(--txt);text-decoration:none;font-size:13px;padding:4px 0;transition:.15s}
+  .f-col a:hover{color:var(--c1)}
+  .f-bottom{max-width:1200px;margin:32px auto 0;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;color:var(--dim);letter-spacing:1.5px}
+
+  @media (max-width: 700px){
+    section{padding:80px 20px}
+    .nav-inner{padding:14px 20px}
+    .nav-links{display:none}
+    .circuit-wrap{padding:24px}
+    .dl{padding:36px 24px}
+    .f-inner{grid-template-columns:1fr 1fr;gap:28px}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 256 256">
+        <circle cx="128" cy="128" r="124" fill="#11151c"/>
+        <path d="M 56 96 L 80 36 L 108 86 L 148 86 L 176 36 L 200 96 C 200 168, 168 208, 128 208 C 88 208, 56 168, 56 96 Z" fill="#e6edf3"/>
+        <circle cx="128" cy="148" r="4" fill="#11151c"/>
+      </svg>
+      murnet
+    </a>
+    <div class="nav-links">
+      <a href="#features">Возможности</a>
+      <a href="#how">Как работает</a>
+      <a href="#faq">FAQ</a>
+      <a href="/directory">Сервисы</a>
+      <a href="/download">Скачать</a>
+    </div>
+    <div class="nav-status">
+      <span class="dot"></span>
+      <span id="status-text">network online</span>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="badge">
+    <span class="new">v1</span>
+    <span>ОФИЦИАЛЬНЫЙ САЙТ · BUILD 2026</span>
+  </div>
+  <h1>Сеть, которая <span class="accent">мурлычет</span><br>и не оставляет следа</h1>
+  <p class="sub">Onion-роутинг, скрытые сервисы, защита от DPI. Собственный стек —
+    не Tor, не VPN. X25519, ChaCha20, replay-protected handshake.</p>
+  <div class="cta-row">
+    <a class="btn btn-primary" href="/download">Скачать браузер <span class="k">↓ 200 MB</span></a>
+    <a class="btn btn-ghost" href="#how">Как работает <span class="k">→</span></a>
+  </div>
+
+  <div class="live-stats">
+    <div class="stat"><div class="v ok" id="net-status">●</div><div class="l">network</div></div>
+    <div class="stat"><div class="v" id="uptime">—</div><div class="l">uptime</div></div>
+    <div class="stat"><div class="v" id="services">—</div><div class="l">services</div></div>
+    <div class="stat"><div class="v">3</div><div class="l">hops</div></div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="section-head">
+    <h2>Что делает MurNet</h2>
+    <p>Свой onion-стек. Своя сеть. Без зависимостей от Tor, VPN-провайдеров и Mozilla-телеметрии.</p>
+  </div>
+  <div class="feature-grid">
+    <div class="feature f1">
+      <span class="num">01</span>
+      <div class="ico">⌬</div>
+      <h3>Onion routing</h3>
+      <p>3-hop circuit: Guard → Middle → Hidden Service. Каждый узел знает только своего соседа, никто не видит цепочку целиком.</p>
+    </div>
+    <div class="feature f2">
+      <span class="num">02</span>
+      <div class="ico">⊜</div>
+      <h3>Никаких следов</h3>
+      <p>X25519 для ephemeral session keys, ChaCha20-Poly1305 на каждый фрейм, PSK + nonce для аутентификации и защиты от replay.</p>
+    </div>
+    <div class="feature f3">
+      <span class="num">03</span>
+      <div class="ico">◉</div>
+      <h3>Свои адреса</h3>
+      <p>.murnet вместо .onion. Ed25519 → Blake2b-160 → Base58Check. Адрес = публичный ключ сервиса, без центрального регистратора.</p>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="section-head">
+    <h2>Как работает</h2>
+    <p>Трафик проходит через 3 узла на VDS. Никто посередине не знает кто вы и куда идёте.</p>
+  </div>
+  <div class="circuit-wrap">
+    <div class="circuit-head">
+      <span class="t">live circuit</span>
+      <span class="live"><span class="dot"></span>established</span>
+    </div>
+    <div class="chain">
+      <div class="node n1">
+        <div class="label">YOU</div>
+        <div class="ip">127.0.0.1</div>
+        <div class="port">:18204</div>
+        <div class="knows">знает: всё<br>не знает: ничего скрывать</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="node n1">
+        <div class="label">GUARD</div>
+        <div class="ip">80.93.52.15</div>
+        <div class="port">:9211 · SPB</div>
+        <div class="knows">знает: ваш IP<br>не знает: куда идёте</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="node n2">
+        <div class="label">MIDDLE</div>
+        <div class="ip">80.93.52.15</div>
+        <div class="port">:9212</div>
+        <div class="knows">знает: соседей<br>не знает: ни вас, ни сайт</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="node n3">
+        <div class="label">HIDDEN SVC</div>
+        <div class="ip">fgsesxh6fb…</div>
+        <div class="port">.murnet</div>
+        <div class="knows">знает: запрос<br>не знает: ваш IP</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-head" style="margin-top:80px">
+    <h2>А чем не Tor?</h2>
+    <p>Свой стек — короче путь, ниже задержка, нет глобальных нагрузок Tor-сети.</p>
+  </div>
+  <div class="compare">
+    <div class="comp us">
+      <div class="h"><h4>MurNet</h4><span class="tag">наш</span></div>
+      <div class="row"><span class="x y">✓</span> 3 хопа (минимум)</div>
+      <div class="row"><span class="x y">✓</span> Бесплатно навсегда</div>
+      <div class="row"><span class="x y">✓</span> Работает в РФ без обхода блокировок</div>
+      <div class="row"><span class="x y">✓</span> Без регистрации и телефона</div>
+      <div class="row"><span class="x y">✓</span> Свой браузер на базе Tor-патчей Mozilla</div>
+      <div class="row"><span class="x y">✓</span> Open source</div>
+    </div>
+    <div class="comp">
+      <div class="h"><h4>Tor</h4><span class="tag">конкурент</span></div>
+      <div class="row"><span class="x y">✓</span> 3 хопа</div>
+      <div class="row"><span class="x y">✓</span> Бесплатно</div>
+      <div class="row"><span class="x n">✗</span> Заблокирован в РФ (нужны мосты)</div>
+      <div class="row"><span class="x y">✓</span> Без регистрации</div>
+      <div class="row"><span class="x y">✓</span> Свой Tor Browser</div>
+      <div class="row"><span class="x y">✓</span> Open source</div>
+    </div>
+    <div class="comp">
+      <div class="h"><h4>VPN</h4><span class="tag">альтернатива</span></div>
+      <div class="row"><span class="x n">✗</span> 1 хоп — провайдер видит всё</div>
+      <div class="row"><span class="x n">✗</span> Платно либо палево</div>
+      <div class="row"><span class="x n">✗</span> Часть блокирована в РФ</div>
+      <div class="row"><span class="x n">✗</span> Аккаунт, привязка карты</div>
+      <div class="row"><span class="x n">✗</span> Обычный браузер с UA-leak</div>
+      <div class="row"><span class="x n">✗</span> Часто проприетарь</div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="section-head">
+    <h2>Частые вопросы</h2>
+    <p>Сходу понять чем MurNet отличается и нужен ли он лично вам.</p>
+  </div>
+  <div class="faq">
+    <details class="qa">
+      <summary>Это легально?</summary>
+      <div class="a">Да. Криптография и анонимизация трафика — не запрещены ни в РФ, ни в других странах. Запрещено использование для совершения преступлений — но это и в обычном интернете запрещено.</div>
+    </details>
+    <details class="qa">
+      <summary>Мне нечего скрывать. Зачем это мне?</summary>
+      <div class="a">«Нечего скрывать» — миф. Провайдер видит каждый сайт куда вы заходите, и хранит это 6 месяцев по закону. Реклама подстраивается под ваши поиски. MurNet это не про «прятать преступление», это про базовый контроль над собственными данными.</div>
+    </details>
+    <details class="qa">
+      <summary>Чем отличается от Tor?</summary>
+      <div class="a">Свой стек, не общая Tor-сеть. Короче путь (3 vs 7 хопов в TB Bridge режиме), быстрее. Не заблокирован в РФ — наш Guard работает напрямую через нестандартный обфускацию. И, главное, не требует мостов и сложных настроек.</div>
+    </details>
+    <details class="qa">
+      <summary>Можно ли мне поднять свой <code>.murnet</code> сайт?</summary>
+      <div class="a">Да. Запускаешь <code>vds_hidden_service.py</code> на любом сервере, получаешь свой <code>xxx.murnet</code> адрес из публичного ключа. Анонс в directory автоматический. Документация в репо.</div>
+    </details>
+    <details class="qa">
+      <summary>Чем гарантируете что нет бэкдоров?</summary>
+      <div class="a">Open source. Весь код в репо, security audit опубликован в <code>core/onion/SECURITY.md</code>. Криптография через стандартную библиотеку <code>cryptography</code> (libsodium под капотом). Никаких самописных AES-ов.</div>
+    </details>
+    <details class="qa">
+      <summary>Как сравнить со скоростью обычного интернета?</summary>
+      <div class="a">Загрузка сайта медленнее на 100-200 мс (3 хопа добавляют латентность). Пропускная способность ограничена самым медленным узлом цепочки — на VDS в СПб ~100 Mbit/s. Для серфинга, чатов, документов — незаметно. Для 4K-видео — медленно.</div>
+    </details>
+    <details class="qa">
+      <summary>Где скачать?</summary>
+      <div class="a">На странице <a href="/download" style="color:var(--c1)">/download</a> — версии для Windows, macOS, Linux. Один файл, не требует установки Python или других зависимостей.</div>
+    </details>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Скачать</h2>
+    <p>Готовый бинарь со встроенным onion-демоном. Один клик — и вы в сети.</p>
+  </div>
+  <div class="dl">
+    <h3>MurNet Browser v1.0</h3>
+    <p>Форк Mullvad Browser с прибитым прокси к нашей сети. Запускается одним кликом — никаких настроек, никаких аккаунтов.</p>
+    <div class="dl-platforms">
+      <a class="dl-plat" href="/download">⊞ Windows<span class="sz">200 MB</span></a>
+      <a class="dl-plat" href="/download"> macOS<span class="sz">220 MB</span></a>
+      <a class="dl-plat" href="/download">🐧 Linux<span class="sz">190 MB</span></a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="f-inner">
+    <div class="f-brand">
+      <a class="brand" href="/">
+        <svg viewBox="0 0 256 256" style="width:24px;height:24px">
+          <circle cx="128" cy="128" r="124" fill="#11151c"/>
+          <path d="M 56 96 L 80 36 L 108 86 L 148 86 L 176 36 L 200 96 C 200 168, 168 208, 128 208 C 88 208, 56 168, 56 96 Z" fill="#e6edf3"/>
+          <circle cx="128" cy="148" r="4" fill="#11151c"/>
+        </svg>
+        murnet
+      </a>
+      <p>Свой onion-стек. Сделано в Екатеринбурге, хостится в СПб. Open source, бесплатно навсегда.</p>
+    </div>
+    <div class="f-col">
+      <h5>Продукт</h5>
+      <a href="/download">Скачать</a>
+      <a href="#features">Возможности</a>
+      <a href="#how">Архитектура</a>
+      <a href="/directory">Сервисы</a>
+    </div>
+    <div class="f-col">
+      <h5>Узнать</h5>
+      <a href="/about">О проекте</a>
+      <a href="#faq">FAQ</a>
+      <a href="/api/docs">API</a>
+      <a href="/api/status">Статус</a>
+    </div>
+    <div class="f-col">
+      <h5>Контакты</h5>
+      <a href="mailto:hi@murnet.local">hi@murnet.local</a>
+      <a href="#">GitHub</a>
+      <a href="#">Telegram</a>
+    </div>
+  </div>
+  <div class="f-bottom">
+    <span>MURNET · 2026 · Built with caffeine and onion routing</span>
+    <span>v1.0 · protocol v2</span>
+  </div>
+</footer>
+
+<script>
+  // Live API: обновляем статус сети
+  fetch('/api/status').then(r => r.json()).then(d => {
+    document.getElementById('uptime').textContent = d.uptime_human || '—';
+    document.getElementById('services').textContent = d.services_count || 1;
+    document.getElementById('net-status').textContent = '●';
+    document.getElementById('status-text').textContent = d.network || 'unknown';
+  }).catch(() => {
+    document.getElementById('uptime').textContent = '—';
+  });
+
+  // Refresh every 30 sec
+  setInterval(() => {
+    fetch('/api/status').then(r => r.json()).then(d => {
+      document.getElementById('uptime').textContent = d.uptime_human || '—';
+    }).catch(() => {});
+  }, 30000);
+</script>
+
+</body>
+</html>
