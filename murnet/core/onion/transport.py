@@ -31,6 +31,8 @@ import logging
 import time
 from typing import Dict, Optional
 
+from murnet.core.net.stun import StunClient, StunResult
+from murnet.core.net.upnp import UPnPClient
 from murnet.core.onion.cell import OnionCell, is_onion_cell
 from murnet.core.onion.directory import RelayDirectory, RelayInfo
 from murnet.core.onion.router import OnionRouter
@@ -80,6 +82,12 @@ class OnionTransport:
 
         self.directory = RelayDirectory()
 
+        # NAT traversal state (populated by start())
+        self.public_addr: Optional[str] = None
+        self.nat_type: str = "unknown"
+        self.upnp_active: bool = False
+
+        self._upnp: Optional[UPnPClient] = None
         self._server: Optional[asyncio.AbstractServer] = None
 
         # Outgoing connections opened by US:  addr -> writer
@@ -106,10 +114,19 @@ class OnionTransport:
         logger.info("[%s] listening on %s:%d",
                     self.router.addr, self.bind_host, self.bind_port)
 
-        if self.self_name:
+        await self._discover_nat()
+
+        if self.self_name and self.public_addr:
             asyncio.create_task(self._announce_loop())
+        elif self.self_name and not self.public_addr:
+            logger.info("[%s] symmetric NAT / blocked — running client-only, "
+                        "will not announce as relay", self.router.addr)
 
     async def stop(self) -> None:
+        if self.upnp_active and self._upnp:
+            await self._upnp.delete_port_mapping(self.bind_port, "TCP")
+            self.upnp_active = False
+
         if self._server:
             self._server.close()
             await self._server.wait_closed()
@@ -118,6 +135,54 @@ class OnionTransport:
                 w.close()
             except Exception:
                 pass
+
+    # ── NAT traversal ─────────────────────────────────────────────────────────
+
+    async def _discover_nat(self) -> None:
+        """
+        Try UPnP first, then STUN.  Sets self.public_addr / nat_type / upnp_active.
+        Runs at startup; failures are non-fatal.
+        """
+        # 1. UPnP
+        upnp = UPnPClient()
+        try:
+            location = await upnp.discover(timeout=3.0)
+        except Exception:
+            location = None
+
+        if location:
+            ext_ip = await upnp.get_external_ip()
+            ok = await upnp.add_port_mapping(
+                self.bind_port, self.bind_port, "TCP", description="murnet"
+            )
+            if ok and ext_ip:
+                self.public_addr = f"{ext_ip}:{self.bind_port}"
+                self.nat_type    = "open"
+                self.upnp_active = True
+                self._upnp       = upnp
+                logger.info("[%s] UPnP mapping active: %s",
+                            self.router.addr, self.public_addr)
+                return
+
+        # 2. STUN fallback
+        stun = StunClient()
+        try:
+            result: StunResult = await stun.discover(self.bind_port)
+        except Exception as exc:
+            logger.debug("STUN error: %s", exc)
+            return
+
+        self.nat_type = result.nat_type
+
+        if result.nat_type in ("open", "cone") and result.public_ip:
+            self.public_addr = f"{result.public_ip}:{result.public_port}"
+            logger.info("[%s] STUN: public_addr=%s nat_type=%s latency=%.1fms",
+                        self.router.addr, self.public_addr,
+                        result.nat_type, result.latency_ms)
+        else:
+            self.public_addr = None
+            logger.info("[%s] STUN: nat_type=%s — no public address reachable",
+                        self.router.addr, result.nat_type)
 
     # ── send ─────────────────────────────────────────────────────────────────
 
@@ -163,7 +228,8 @@ class OnionTransport:
         """Periodically broadcast self as a relay to all connected peers."""
         while True:
             await asyncio.sleep(_ANNOUNCE_TTL)   # short delay before first announce
-            await self._broadcast_announce(self.router.addr, self.self_name, _ANNOUNCE_TTL)
+            addr = self.public_addr or self.router.addr
+            await self._broadcast_announce(addr, self.self_name, _ANNOUNCE_TTL)
             await asyncio.sleep(_ANNOUNCE_EVERY - _ANNOUNCE_TTL)
 
     async def _broadcast_announce(self, addr: str, name: str, ttl: int) -> None:

@@ -29,6 +29,7 @@
 ## Установка
 
 ```bash
+pip install murnet                    # из PyPI (стабильная)
 pip install -e .                      # из исходников (dev)
 pip install -e ".[tui,dev]"           # с extras
 ```
