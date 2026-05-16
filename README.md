@@ -1,248 +1,153 @@
 <div align="center">
   <img src="assets/icons/logo.svg" width="120" alt="MurNet logo" />
   <h1>MurNet</h1>
-  <p>Децентрализованная P2P-сеть с onion-маршрутизацией, DHT и VPN-туннелем</p>
+  <p>Decentralized P2P network with onion routing, DHT, and VPN tunneling</p>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-  [![PyPI](https://img.shields.io/pypi/v/murnet.svg)](https://pypi.org/project/murnet/)
-  [![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)](docs/ARCHITECTURE.md)
+  [![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)](docs/en/ARCHITECTURE.md)
+  <br>
+  <a href="README_RU.md">🇷🇺 Русская версия</a>
 </div>
 
 ---
 
-**MurNet** — экспериментальная децентрализованная P2P-сеть с onion-маршрутизацией, DHT и VPN-туннелем.
+**MurNet** is an experimental decentralized P2P network featuring onion routing, Kademlia DHT, and VPN/SOCKS5 tunneling.
 
-Узлы связываются напрямую, без центральных серверов. Трафик проходит через многослойное шифрование (X25519 + AES-256-GCM). Архитектура построена по принципу **security by design**.
+Nodes connect directly without central servers. Traffic is protected via multi-layered encryption (X25519 + AES-256-GCM). The architecture follows **security by design** principles.
 
-> ⚠️ **Учебный прототип.** Не прошёл криптографический аудит. Не использовать для трафика, требующего реальной анонимности.
+> ⚠️ **Educational Prototype.** This project has NOT undergone a cryptographic audit. Do not use it for traffic requiring real anonymity or high-stakes security.
 
 ---
 
-## Возможности
+## Why MurNet?
 
-| Компонент | Описание |
+MurNet was created as a playground for learning modern P2P technologies. Key goals include:
+1.  **Transparency:** A "from scratch" implementation of onion routing (pure Python + asyncio) so anyone can understand how circuits are built and keys are exchanged.
+2.  **Decentralization:** Leveraging Kademlia DHT for peer discovery without any central points of failure (no Directory Authorities).
+3.  **Modern Stack:** Using modern primitives (Ed25519, X25519, Argon2id) instead of legacy RSA/SHA-1.
+
+## Gallery
+
+| Component | Description |
 |---|---|
-| **Onion routing** | 3-хоп circuit, X25519 ECDH + AES-256-GCM |
-| **Relay discovery** | Gossip-анонсы — relay-ноды находят друг друга автоматически |
-| **DHT** | Kademlia с HMAC-аутентификацией |
-| **VPN / SOCKS5** | Туннель TCP-трафика через onion-цепочку |
-| **Identity** | Ed25519 ключи, Base58 адреса, NodeID на Blake2b |
-| **REST API** | FastAPI для управления узлом |
-| **TUI Chat** | Textual-интерфейс для anonymous-чата в терминале |
+| **Onion Chat (TUI)** | Interactive terminal chat visualizing cell transit through network nodes. |
+| **Network Visualizer** | Live network map using Force-Directed Layout (tkinter) — shows connections and RTT. |
+| **Desktop App** | GUI client for local node management and traffic monitoring. |
+
+*(Screenshots are available in the `assets/screenshots/` folder)*
 
 ---
 
-## Установка
+## Features
+
+| Component | Description |
+|---|---|
+| **Onion routing** | 3-hop circuits, X25519 ECDH + AES-256-GCM |
+| **Relay discovery** | Gossip announcements — relay nodes find each other automatically |
+| **DHT** | Kademlia with HMAC authentication |
+| **VPN / SOCKS5** | TCP traffic tunneling through onion chains |
+| **Identity** | Ed25519 keys, Base58 addresses, Blake2b NodeIDs |
+| **REST API** | FastAPI-powered node control |
+| **TUI Chat** | Textual-based anonymous chat interface |
+
+---
+
+## Installation
 
 ```bash
-pip install murnet                    # из PyPI (стабильная)
-pip install -e .                      # из исходников (dev)
-pip install -e ".[tui,dev]"           # с extras
+pip install murnet                    # from PyPI (stable)
+pip install -e .                      # from source (dev)
+pip install -e ".[tui,dev]"           # with extras
 ```
 
-Дополнительные extras:
+Optional extras:
 
-| Extra | Назначение |
+| Extra | Purpose |
 |---|---|
-| `tui` | Textual TUI для `murnet-node` chat-режима |
-| `browser` | PyQt6 для onion-браузера |
-| `build` | PyInstaller для сборки EXE |
+| `tui` | Textual TUI for `murnet-node` chat mode |
+| `browser` | PyQt6 for the onion browser |
+| `build` | PyInstaller for EXE builds |
 | `dev` | pytest, pytest-asyncio, pytest-cov |
 
-Python 3.11+ обязателен.
+Python 3.11+ is required.
 
 ---
 
-## Быстрый старт
+## Quick Start
 
-После установки доступны команды:
+After installation, the following commands are available:
 
-| Команда | Что делает |
+| Command | Action |
 |---|---|
-| `murnet` | CLI полного узла |
-| `murnet-node` | Relay-нода или chat-участник |
-| `murnet-vpn` | VPN/SOCKS5 клиент |
+| `murnet` | Full node CLI |
+| `murnet-node` | Relay node or chat participant |
+| `murnet-vpn` | VPN/SOCKS5 client |
 | `murnet-desktop` | Desktop GUI |
 
-### Onion-чат (5 терминалов, localhost)
+### Onion Chat (5 terminals, localhost)
 
 ```bash
-# 3 relay-ноды, каждая анонсирует себя в gossip
+# Start 3 relay nodes, each announcing itself via gossip
 murnet-node --bind 127.0.0.1:9001 --name Guard  --announce
 murnet-node --bind 127.0.0.1:9002 --name Middle --announce
 murnet-node --bind 127.0.0.1:9003 --name Exit   --announce
 
-# Bob — строит circuit Exit → Middle → Alice
+# Bob — builds circuit: Exit → Middle → Alice
 murnet-node --bind 127.0.0.1:9004 --name Bob \
     --peer Exit=127.0.0.1:9003 --peer Middle=127.0.0.1:9002 \
     --peer Alice=127.0.0.1:9000 --circuit Exit,Middle,Alice
 
-# Alice — auto-discovery, знает только Guard
+# Alice — auto-discovery, only knows Guard
 murnet-node --bind 127.0.0.1:9000 --name Alice \
     --peer Guard=127.0.0.1:9001 --circuit auto
 ```
 
-### VPN / SOCKS5
-
-```bash
-murnet-vpn --mode local
-# SOCKS5 прокси на 127.0.0.1:1080
-curl --socks5 127.0.0.1:1080 http://example.com
-```
-
-### Полный узел
-
-```bash
-murnet --port 8888 --data-dir ./murnet-data
-```
-
 ---
 
-## Программный API
+## Programmatic API
 
 ```python
 from murnet import MurnetNode, Identity, MurnetConfig
 
-# Идентификация узла (Ed25519)
+# Generate node identity (Ed25519)
 identity = Identity.generate()
 print(identity.node_id)        # Blake2b NodeID
-print(identity.address)        # Base58 адрес
+print(identity.address)        # Base58 Address
 
-# Запуск узла
+# Start the node
 config = MurnetConfig(port=8888, data_dir="./data")
 node = MurnetNode(identity, config)
 await node.start()
 ```
 
-Onion-цепочки:
-
-```python
-from murnet.core.onion.circuit import CircuitManager
-from murnet.core.onion.router import OnionRouter
-
-router = OnionRouter(identity)
-circuit = await router.build_circuit(["Guard", "Middle", "Exit"])
-await router.send(circuit.id, b"hello onion")
-```
-
 ---
 
-## Структура проекта
-
-```
-murnet/                      ← Python-пакет
-├── __init__.py              реэкспорты публичного API
-├── cli.py                   точка входа `murnet`
-├── desktop_app.py           точка входа `murnet-desktop`
-├── murnet_vpn.py            VPN runtime
-├── network_viz.py           визуализатор сети
-├── build_exe.py             PyInstaller сборка
-├── core/
-│   ├── identity/            Ed25519, X25519, NodeID, keystore
-│   ├── net/                 UDP transport, Kademlia DHT, link-state routing
-│   ├── onion/               onion routing: cell, circuit, router, transport
-│   ├── node/                AsyncMurnetNode, pubsub
-│   ├── data/                content-addressed storage, SQLite
-│   ├── vpn/                 TunnelManager, SOCKS5 server
-│   └── config.py
-├── api/                     FastAPI server, JWT auth, Pydantic-модели
-├── demos/                   onion_node.py, onion_chat.py, vpn_client.py
-├── mobile/                  battery, network, sync — оптимизации для мобильных
-└── vds/                     Docker/systemd генераторы для VDS-деплоя
-
-docs/                        Документация
-tests/                       pytest: unit/, integration/, security/, performance/
-scripts/                     CLI-скрипты (генерация конфига, миграция, статус)
-configs/                     Шаблоны конфигов VPN
-```
-
----
-
-## Тесты
-
-```bash
-pip install -e ".[dev]"
-
-pytest tests/unit/ -q                       # 460+ unit-тестов
-pytest tests/integration/ -v --timeout=60   # e2e onion circuit
-pytest tests/security/ -v                   # security-проверки
-pytest --cov=murnet --cov-report=term-missing
-```
-
----
-
-## Архитектура (коротко)
+## Architecture (Briefly)
 
 ```
 Alice  →  Guard  →  Middle  →  Bob
-         видит        видит        видит
+         sees         sees         sees
          Alice        Guard        Middle
-         Guard        Middle       (расшифрованные данные)
+         Guard        Middle       (decrypted data)
 ```
 
-Каждый хоп получает независимый сессионный ключ через X25519 ECDH + HKDF-SHA256. Компрометация одного хопа не раскрывает остальные.
+Each hop receives an independent session key via X25519 ECDH + HKDF-SHA256. Compromising one hop does not reveal the entire chain.
 
-Подробности: [docs/ONION.md](docs/ONION.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PROTOCOL.md](docs/PROTOCOL.md).
-
----
-
-## NAT и где живут узлы
-
-| Сценарий | Что нужно |
-|---|---|
-| **VDS с публичным IP** | Открыть TCP-порт через firewall — узел работает как relay |
-| **Домашний компьютер за роутером** | Сейчас — только client-режим (инициирует, не принимает). UPnP/STUN — в roadmap |
-| **CGNAT / симметричный NAT** | Только client. Hole-punching через rendezvous-relay — в roadmap |
-
-Обратные ответы идут по тому же TCP-соединению, что инициировал клиент, — relay никогда не открывает обратное соединение, поэтому клиент за NAT может пользоваться сетью, но не быть relay'ем. Подробнее: [docs/ONION.md](docs/ONION.md#nat-traversal).
+Details: [docs/en/ONION.md](docs/en/ONION.md), [docs/en/ARCHITECTURE.md](docs/en/ARCHITECTURE.md).
 
 ---
 
-## VDS деплой relay-нод
+## Security
 
-```bash
-# Деплой Guard/Middle/Exit через SCP + systemd
-./scripts/vds.sh deploy
+This is an **educational** project:
+- No cryptographic audit has been performed.
+- Anonymity is only effective with a large number of independent relay nodes.
+- In the default local config (3 nodes on one machine), there is virtually no anonymity; the routing is purely decorative.
 
-# Статус (curl на API каждой ноды)
-./scripts/vds.sh status
-
-# Логи
-./scripts/vds.sh logs Guard
-```
-
-Подробности: [docs/VDS.md](docs/VDS.md).
+Do not use for high-risk communication. Use [Tor](https://www.torproject.org/), [I2P](https://geti2p.net/), or [Briar](https://briarproject.org/) instead.
 
 ---
 
-## Документация
-
-| Файл | Содержание |
-|---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Архитектура узла, слои, потоки данных |
-| [docs/ONION.md](docs/ONION.md) | Onion routing: протокол, циклы CREATE/EXTEND, NAT, gossip |
-| [docs/PROTOCOL.md](docs/PROTOCOL.md) | UDP wire-протокол, форматы сообщений |
-| [docs/API.md](docs/API.md) | REST API, JWT-аутентификация, эндпоинты |
-| [docs/VDS.md](docs/VDS.md) | Деплой на VDS, systemd, Docker, мониторинг |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Сборка, тесты, contributing |
-| [docs/MOBILE.md](docs/MOBILE.md) | Мобильные оптимизации (battery, network, sync) |
-
----
-
-## Безопасность
-
-Это **учебный** проект:
-
-- Криптографический аудит **не проводился**
-- Анонимность гарантирована только при наличии многих независимых relay-нод
-- В текущей конфигурации (3 узла на одном VDS) — анонимности фактически нет, маршрутизация декоративная
-- TLS-обёртка отключена из-за DPI — узлы используют голый X25519+PSK
-
-Не использовать для угроз жизни, медицинских данных, юридически чувствительной переписки. Для этого есть [Tor](https://www.torproject.org/), [I2P](https://geti2p.net/), [Briar](https://briarproject.org/).
-
----
-
-## Лицензия
-
-MIT — см. [LICENSE](LICENSE).
+## License
+MIT — see [LICENSE](LICENSE).
